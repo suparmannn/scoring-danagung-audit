@@ -117,6 +117,16 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.floating): return float(obj)
         if isinstance(obj, np.ndarray): return obj.tolist()
         return super(NpEncoder, self).default(obj)
+    
+    # --- HELPER FUNCTIONS ---
+def format_rp(val):
+    """Mengubah angka (int/float) jadi teks format Rp 1.000.000"""
+    return f"Rp {val:,.0f}".replace(",", ".")
+
+def parse_rp(text):
+    """Membersihkan teks format Rp agar jadi angka murni (int)"""
+    clean = "".join(filter(str.isdigit, str(text)))
+    return int(clean) if clean else 0
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
@@ -435,27 +445,72 @@ with tab_cap:
         angs_diambil = st.number_input("Angsuran yang Akan Diambil", value=st.session_state.get('angs_diambil_val', 0))
 
     with c2:
-        # FIX: Definisi Rumus & Maks Angsuran agar tidak NameError
+       # 1. LOGIKA PERHITUNGAN (Kebijakan vs Aktual)
+        # Total beban aktual adalah Angsuran Baru + Beban yang dipilih di settings
+        total_beban_aktual = angs_diambil + beban_idir
+        plafon_maks_kebijakan = (total_penghasilan * params_max_angs_diambil / 100)
+        sisa_kuota = plafon_maks_kebijakan - total_beban_aktual
+
+        # Hitung Nilai Persentase untuk Tampilan Metric
         dsr_val = round((beban_dsr / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
-        idir_val = round(((angs_diambil + beban_idir) / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
+        idir_val = round((total_beban_aktual / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
         
-        # Rumus Maks Angsuran berdasarkan batas % yang dipilih di sidebar
-        maksAngsuran = (total_penghasilan * params_max_angs_diambil / 100) - beban_idir
+        # Tampilkan Metric Utama
+        st.metric("DSR (%)", f"{dsr_val}%", help="Hanya menghitung parameter beban lama yang dipilih di Settings")
+        st.metric("IDIR (%)", f"{idir_val}%", help="Menghitung angsuran baru + total beban pilihan di Settings")
         
-        st.metric("DSR (%)", f"{dsr_val}%", help="Hanya menghitung parameter yang dipilih di Settings")
-        st.metric("IDIR (%)", f"{idir_val}%", help="Menghitung angsuran baru + parameter pilihan di Settings")
-        st.warning(f"Sisa Kapasitas Angsuran (Maks): Rp {maksAngsuran:,.0f}")
+        st.markdown("---")
+
+        # 2. INDIKATOR BAR VISUAL (Koreksi Slider)
+        st.write(f"**Pemanfaatan Kuota Angsuran ({params_max_angs_diambil}%)**")
         
-        # Simpan ke user_inputs untuk proses audit
+        # Logika Warna: Merah jika beban melebihi plafon kebijakan
+        rasio_pemanfaatan = total_beban_aktual / plafon_maks_kebijakan if plafon_maks_kebijakan > 0 else 0
+        bar_color = "#22c55e" if rasio_pemanfaatan <= 1.0 else "#ef4444"
+        bar_label = "AMAN" if rasio_pemanfaatan <= 1.0 else "OVERLIMIT"
+        
+        st.progress(min(rasio_pemanfaatan, 1.0))
+
+        # 3. CATATAN AUDITOR (Box Informasi Ala OJK)
+        st.markdown(f"""
+            <div style="background-color: #f1f5f9; padding: 15px; border-radius: 10px; border-left: 5px solid {bar_color}; margin-bottom: 20px;">
+                <p style="color: #475569; margin: 0; font-size: 0.8rem; font-weight: bold;">CATATAN VERIFIKASI:</p>
+                <p style="color: #1e293b; margin: 5px 0; font-size: 0.9rem;">
+                    • <b>Batas Plafon:</b> {format_rp(plafon_maks_kebijakan)} (Kebijakan {params_max_angs_diambil}%)<br>
+                    • <b>Total Beban:</b> {format_rp(total_beban_aktual)} (Aktual Pengeluaran)<br>
+                    • <b>Status Kapasitas:</b> <span style="color:{bar_color}; font-weight:bold;">{bar_label}</span>
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Menampilkan Sisa Kapasitas dengan visual warna
+        if sisa_kuota >= 0:
+            st.success(f"Sisa Kapasitas Angsuran (Maks): **{format_rp(sisa_kuota)}**")
+        else:
+            st.error(f"Defisit Kemampuan Bayar: **{format_rp(abs(sisa_kuota))}**")
+
+        st.markdown("---")
+
+        # 4. UPDATE DATA UNTUK PROSES AUDIT & INPUT TAMBAHAN
+        # Menambahkan unique key pada setiap input agar aman di hosting
         user_inputs.update({
-            'dsr': dsr_val, 'idir': idir_val, 'jlh_penghasilan': total_penghasilan,
-            'tenor': st.number_input("Tenor", value=30),
-            'usia': st.number_input("Usia", value=41),
-            'lama_kerja': st.number_input("Lama Kerja", value=3.0),
-            'status_perkawinan': st.selectbox("Status Perkawinan", get_options_safe('status_perkawinan')),
-            'daya_listrik': st.selectbox("Daya Listrik", get_options_safe('daya_listrik')),
-            'periode_penghasilan': st.selectbox("Periode Penghasilan", get_options_safe('periode_penghasilan'))
+            'dsr': dsr_val, 
+            'idir': idir_val, 
+            'jlh_penghasilan': total_penghasilan,
+            'tenor': st.number_input("Tenor (Bulan)", value=30, key="cap_tenor"),
+            'usia': st.number_input("Usia", value=41, key="cap_usia"),
+            'lama_kerja': st.number_input("Lama Kerja (Tahun)", value=3.0, key="cap_work"),
+            'status_perkawinan': st.selectbox("Status Perkawinan", get_options_safe('status_perkawinan'), key="cap_merit"),
+            'daya_listrik': st.selectbox("Daya Listrik", get_options_safe('daya_listrik'), key="cap_power"),
+            'periode_penghasilan': st.selectbox("Periode Penghasilan", get_options_safe('periode_penghasilan'), key="cap_period")
         })
+
+        with st.expander("💡 Info Logika Slider"):
+            st.caption(f"""
+                Slider 'Batas Max' di sidebar adalah plafon kebijakan bank ({params_max_angs_diambil}%). 
+                Angka ini tidak merubah pengeluaran rill nasabah, melainkan merubah 'Batas Plafon' 
+                untuk melihat apakah pengeluaran aktual nasabah masih masuk dalam kuota atau tidak.
+            """)
 
 with tab_char:
     st.subheader("CHARACTER")
@@ -562,72 +617,113 @@ WEIGHT_CONFIG = {
 }
 
 
-# --- 5. Button PERHITUNGAN & OUTPUT ---
+
+
+# --- 5. LOGIKA TOMBOL & HASIL (DENGAN SESSION STATE AGAR TIDAK RESET) ---
+
+# Inisialisasi state agar hasil audit tidak hilang saat slider digeser
+if 'audit_run' not in st.session_state:
+    st.session_state.audit_run = False
 
 if st.button("RUN AUDIT CALCULATION", type="primary", use_container_width=True):
+    st.session_state.audit_run = True
+
+# Hanya jalan jika tombol pernah diklik
+if st.session_state.audit_run:
     prod_id = str(selected_id_produk).strip()
     cat_weight_map = WEIGHT_CONFIG.get(prod_id, WEIGHT_CONFIG["002"])
+
+    # RE-CALCULATE VARIABLES (Agar tidak NameError)
+    # Kita hitung ulang di sini supaya variabel tersedia untuk JSON & Stress Test
+    current_vals_murni = {
+        'p_rt_murni': p_rt_murni_calc, 'p_sekolah': p_sekolah,
+        'p_transport': p_transport, 'p_listrik': p_listrik,
+        'p_telepon': p_telepon, 'p_hutang': p_hutang, 'p_arisan': p_arisan
+    }
+    
+    # Ambil angka beban dari setting sidebar
+    beban_idir_audit = sum(current_vals_murni.get(p, 0) for p in selected_idir)
+    total_beban_aktual_audit = angs_diambil + beban_idir_audit
+    
+    # Hitung Maks Angsuran (Variable yang tadi error)
+    maksAngsuran_audit = (total_penghasilan * params_max_angs_diambil / 100) - beban_idir_audit
 
     details = []
     rules_table = df_hitung[df_hitung['id_produk'] == selected_id_produk]
     
-    # 1. LOOP KALKULASI DATA
     for _, row in rules_table.iterrows():
         f_name = row['group']
-        # --- FITUR BARU: Filter Poin Scoring ---
         if f_name in active_scoring_fields:
             p = find_point(f_name, user_inputs.get(f_name, 0))
             w = row['bobot']
         else:
-            # Jika tidak dicentang di sidebar, poin otomatis 0
-            p = 0
-            w = 0
-            
-        details.append({
-            'Category': str(row['score_type']).lower().strip(),
-            'Field': f_name, 
-            'Point': p, 'Weight': w, 'Weighted': p * w
-        })
+            p, w = 0, 0
+        details.append({'Category': str(row['score_type']).lower().strip(), 'Field': f_name, 'Point': p, 'Weight': w, 'Weighted': p * w})
 
-    # 2. INPUT AGUNAN DINAMIS
-    total_coll_points_raw = 0
-    for asset in st.session_state.collaterals:
-        p_a = find_point('agunan', asset['unit_name']) or 5
-        p_k = find_point('kepemilikan_aset', asset['kepemilikan']) or 5
-        total_coll_points_raw += (p_a + p_k + 30)
-
-    details.append({
-        'Category': 'collateral', 'Field': 'dynamic_collateral', 'Value': f"{len(st.session_state.collaterals)} Assets",
-        'Point': total_coll_points_raw, 'Weight': 1.0, 'Weighted': total_coll_points_raw
-    })
-
-    # 3. PROSES SUMMARY & SKOR BE
+    # PROSES SUMMARY
     df_res = pd.DataFrame(details)
     summary = df_res.groupby('Category').agg({'Point': 'sum', 'Weighted': 'sum'}).reset_index()
     summary['Cat_Weight'] = summary['Category'].map(cat_weight_map).fillna(0)
     summary['Skor_BE'] = summary['Weighted'] * summary['Cat_Weight'] * 100
     total_be_score = round(summary['Skor_BE'].sum(), 0)
 
-    # 4. LOOKUP RISIKO & DEFINISI WARNA (WAJIB DI SINI AGAR TIDAK ERROR)
-    final_risk_data = next((
-        risk for risk in MASTER_RISIKO_SCORE 
-        if risk['range_score']['min'] <= total_be_score <= risk['range_score']['max']
-        and risk['range_score_credit_checking']['min'] <= val_credit_check <= risk['range_score_credit_checking']['max']
-    ), {"_id": 0, "nama_risiko": "Manual Review", "level": "N/A", "deskripsi": "Skor diluar jangkauan."})
-
-    # Tentukan Warna Berdasarkan Status
+    # LOOKUP RISIKO
+    final_risk_data = next((risk for risk in MASTER_RISIKO_SCORE if risk['range_score']['min'] <= total_be_score <= risk['range_score']['max'] and risk['range_score_credit_checking']['min'] <= val_credit_check <= risk['range_score_credit_checking']['max']), {"nama_risiko": "Manual Review", "deskripsi": "Skor diluar jangkauan."})
     color_map = {"Risiko Rendah": "#22c55e", "Risiko Sedang": "#eab308", "Risiko Tinggi": "#ef4444", "Reject": "#ef4444"}
     risk_color = color_map.get(final_risk_data['nama_risiko'], "#3b82f6")
 
-    # 5. PROSES DISPLAY TABLE (CLEAN FORMAT)
-    summary_display = summary.copy()
-    summary_display['Total Poin'] = summary_display['Point'].astype(int)
-    summary_display['Weighted Subtotal'] = summary_display['Weighted'].map("{:,.2f}".format)
-    summary_display['Bobot Produk'] = (summary_display['Cat_Weight']).map("{:,.2f}".format)
-    summary_display['Skor Final'] = summary_display['Skor_BE'].map("{:,.2f}".format)
-    summary_display = summary_display[['Category', 'Total Poin', 'Weighted Subtotal', 'Bobot Produk', 'Skor Final']]
+    # --- FITUR: SCORING SENSITIVITY (STRESS TEST) ---
+    # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
+    st.markdown("---")
+    st.subheader("🔍 Stress Test: Sensitivity Analysis")
+    st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
-    # 6. UI OUTPUT (PREMIUM OJK STYLE)
+    # 1. Slider untuk Simulasi Penurunan Penghasilan
+    stress_factor = st.slider("Simulasi Penurunan Penghasilan (%)", 0, 50, 20, help="Geser untuk simulasi penurunan penghasilan (Misal: 20%)")
+    
+    # 2. Kalkulasi Ulang (Kondisi Stress)
+    income_stressed = total_penghasilan * (1 - (stress_factor / 100))
+    
+    # Hitung ulang DSR/IDIR di kondisi stress
+    idir_stressed = round((total_beban_aktual / income_stressed * 100), 2) if income_stressed > 0 else 0
+    
+    # Hitung ulang Skor BE (Asumsi poin Kapasitas turun jika penghasilan turun)
+    # Kita buat simulasi skor BE turun proporsional dengan faktor stress pada pilar Capacity
+    reduction_impact = (total_be_score * (stress_factor/100) * 0.4) # Asumsi bobot kapasitas 40%
+    score_stressed = round(total_be_score - reduction_impact, 0)
+
+    # 3. Lookup Risiko Baru (Kondisi Stress)
+    stressed_risk_data = next((
+        risk for risk in MASTER_RISIKO_SCORE 
+        if risk['range_score']['min'] <= score_stressed <= risk['range_score']['max']
+        and risk['range_score_credit_checking']['min'] <= val_credit_check <= risk['range_score_credit_checking']['max']
+    ), {"nama_risiko": "High Risk", "deskripsi": "Skor anjlok drastis."})
+
+    # Tentukan Warna Status Stress
+    stress_color = "#22c55e" if "Rendah" in stressed_risk_data['nama_risiko'] else ("#eab308" if "Sedang" in stressed_risk_data['nama_risiko'] else "#ef4444")
+
+    # 4. Tampilan Visual Perbandingan
+    col_sim1, col_sim2 = st.columns(2)
+    
+    with col_sim1:
+        st.info(f"**Kondisi Saat Ini**")
+        st.write(f"Penghasilan: {format_rp(total_penghasilan)}")
+        st.write(f"IDIR: {idir_val}%")
+        st.write(f"Status: **{final_risk_data['nama_risiko']}**")
+
+    with col_sim2:
+        st.warning(f"**Kondisi Stress (-{stress_factor}%)**")
+        st.write(f"Penghasilan: {format_rp(income_stressed)}")
+        st.write(f"IDIR: {idir_stressed}%")
+        st.markdown(f"Status: <span style='color:{stress_color}; font-weight:bold;'>{stressed_risk_data['nama_risiko']}</span>", unsafe_allow_html=True)
+
+    # Pesan Kesimpulan Stress Test
+    if stressed_risk_data['nama_risiko'] != final_risk_data['nama_risiko']:
+        st.error(f"⚠️ **Peringatan Auditor:** Kredit ini SENSITIF terhadap penurunan penghasilan. Penurunan {stress_factor}% merubah status menjadi {stressed_risk_data['nama_risiko']}.")
+    else:
+        st.success(f"✅ **Kesimpulan:** Kredit ini RESILIEN (Kuat). Penurunan {stress_factor}% tidak merubah status risiko.")
+
+    # --- UI OUTPUT (REPORT CARD) ---
     st.divider()
     st.markdown(f"""
         <div class="report-card">
@@ -639,36 +735,32 @@ if st.button("RUN AUDIT CALCULATION", type="primary", use_container_width=True):
         </div>
     """, unsafe_allow_html=True)
 
-    st.table(summary_display)
+    # TAMPILKAN TABEL SUMMARY
+    summary_display = summary.copy()
+    summary_display['Total Poin'] = summary_display['Point'].astype(int)
+    summary_display['Weighted Subtotal'] = summary_display['Weighted'].map("{:,.2f}".format)
+    summary_display['Bobot Produk'] = (summary_display['Cat_Weight']).map("{:,.2f}".format)
+    summary_display['Skor Final'] = summary_display['Skor_BE'].map("{:,.2f}".format)
+    st.table(summary_display[['Category', 'Total Poin', 'Weighted Subtotal', 'Bobot Produk', 'Skor Final']])
 
-    # 7. JSON CONSTRUCTOR
-    def get_scoring_list_internal(category_key):
-        if df_res.empty: return []
-        filtered = df_res[df_res['Category'] == category_key.lower()]
-        return [{"id": find_rule_id(r['Field'], r.get('Value', '')), "group": r['Field'], 
-                 "text": str(r.get('Value', '')), "value": r.get('Value', ''), "point": int(r['Point'])} 
-                for _, r in filtered.iterrows()]
-
+    # --- JSON CONSTRUCTOR (FIX NAMEERROR) ---
     json_output = {
-        "error": 0, "message": "OK", "response_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data": {
-            "pengajuan": {"product_id": prod_id, "total_be_score": total_be_score, "risk_status": final_risk_data['nama_risiko']},
-            "risk_analysis": final_risk_data,
+            "pengajuan": {
+                "product_id": prod_id, 
+                "total_be_score": total_be_score, 
+                "risk_status": final_risk_data['nama_risiko']
+            },
             "scoring": {
-                "char": get_scoring_list_internal('character'),
                 "capa": [{
-                        "total_penghasilan": total_penghasilan, "total_pengeluaran": p_rt_murni,
-                        "max_angs": maksAngsuran, "angs_diambil": angs_diambil,
+                        "total_penghasilan": total_penghasilan, 
+                        "max_angs": maksAngsuran_audit, # Variabel sudah didefinisikan di atas
+                        "angs_diambil": angs_diambil,
                         "idir": idir_val, "dsr": dsr_val
-                }] + get_scoring_list_internal('capacity'),
-                "cond": get_scoring_list_internal('condition'),
-                "capi": get_scoring_list_internal('capital'),
-                "coll_agunan": coll_agunan_json
+                }]
             }
         }
     }
-
-    # DOWNLOAD & PREVIEW
-    st.download_button("💾 Download Result JSON", json.dumps(json_output, indent=4, cls=NpEncoder), "scoring_audit_result.json", "application/json")
+    st.download_button("💾 Download Result JSON", json.dumps(json_output, indent=4, cls=NpEncoder), "audit_result.json")
     with st.expander("🔍 Lihat Preview JSON"):
         st.json(json_output)
