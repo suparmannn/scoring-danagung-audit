@@ -1,6 +1,6 @@
 # instal librari: pip install pandas streamlit openpyxl
 # cara run: streamlit run scoring.py
-import json
+# import json
 import streamlit as st
 import pandas as pd
 import os
@@ -97,17 +97,17 @@ st.markdown("""
     border-left: 12px solid #eab308 !important;
 }
 
-/* --- STYLING TABS DANAGUNG --- */
-    /* Container utama Tab */
-    div[data-testid="stTabs"] {
-        background-color: #1e293b; /* Menyesuaikan background dark slate Bapak */
-        padding: 10px 20px 0px 20px;
-        border-radius: 15px 15px 0 0;
-    }
+# /* --- STYLING TABS DANAGUNG --- */
+#     /* Container utama Tab */
+#     div[data-testid="stTabs"] {
+#         background-color: #e2e8f0; /* Menyesuaikan background dark slate Bapak */
+#         padding: 10px 20px 0px 20px;
+#         border-radius: 15px 15px 0 0;
+#     }
 
     /* Style untuk setiap tombol Tab */
     button[data-baseweb="tab"] {
-        color: #94a3b8 !important; /* Warna teks saat tidak aktif (Abu-abu) */
+        color: #1e293b !important; /* Warna teks saat tidak aktif (Abu-abu) */
         font-weight: bold;
         font-size: 1rem;
         transition: all 0.3s ease;
@@ -129,6 +129,46 @@ st.markdown("""
     /* Menghilangkan garis bawah default Streamlit yang tipis */
     div[data-testid="stTabs"] [data-baseweb="tab-list"] {
         border-bottom: 1px solid #334155;
+    }
+            
+            /* --- STYLE LIST ALA SLIDE PPT --- */
+    .ppt-container {
+        margin: 20px 0;
+    }
+
+    .ppt-card {
+        background: #1e293b; /* Warna gelap slate */
+        border-left: 10px solid #c21b1b; /* Aksen Merah Danagung */
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 0 15px 15px 0;
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease;
+    }
+
+    .ppt-card:hover {
+        transform: scale(1.02);
+        border-left: 10px solid #eab308; /* Berubah jadi Emas saat di-hover */
+    }
+
+    .ppt-title {
+        color: #eab308; /* Warna Emas untuk Judul */
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+    }
+
+    .ppt-content {
+        color: #e2e8f0;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .ppt-icon {
+        margin-right: 10px;
+        font-size: 1.4rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -481,6 +521,7 @@ with st.expander("🛠️ Technical Specifications (Built by M. Suparman)"):
         </ul>
     </div>
     """, unsafe_allow_html=True)
+    
 
 with tab_risk:
     st.subheader("📋 Master Matrix Risiko")
