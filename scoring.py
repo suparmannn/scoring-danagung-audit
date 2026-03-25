@@ -413,8 +413,11 @@ with tab_cap:
 
         # --- PERBAIKAN DI SINI ---
         # Gunakan p_rt_murni_calc (angka), JANGAN p_rt_murni (teks)
+       # Di tab_cap, pastiin dictionary ini lengkap semua key-nya
         current_vals = {
-            'p_rt_murni': p_rt_murni_calc, # <--- Ganti bagian ini
+            'total_penghasilan': total_penghasilan, 
+            'pengeluaran_usaha': pengeluaran_usaha,
+            'p_rt_murni': p_rt_murni_calc, 
             'p_sekolah': p_sekolah,
             'p_transport': p_transport,
             'p_listrik': p_listrik,
@@ -424,8 +427,9 @@ with tab_cap:
         }
 
         # Sekarang sum() tidak akan error karena isinya angka semua
-        beban_dsr = sum(current_vals[p] for p in selected_dsr)
-        beban_idir = sum(current_vals[p] for p in selected_idir)
+        # Pakai .get(p, 0) supaya kalau key tidak ketemu, aplikasi tidak crash
+        beban_dsr = sum(current_vals.get(p, 0) for p in selected_dsr)
+        beban_idir = sum(current_vals.get(p, 0) for p in selected_idir)
         
         st.error(f"Beban Terpilih: DSR (Rp {beban_dsr:,.0f}) | IDIR (Rp {beban_idir:,.0f})")
         angs_diambil = st.number_input("Angsuran yang Akan Diambil", value=st.session_state.get('angs_diambil_val', 0))
