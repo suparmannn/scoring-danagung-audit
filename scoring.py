@@ -7,6 +7,7 @@ import os
 import json
 import numpy as np
 from datetime import datetime
+from automation import apply_automation, get_scenario_presets
 
 st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
 
@@ -14,6 +15,19 @@ st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
 # --- REVISI CSS (Ganti Poin 3 & 5) ---
 st.markdown("""
     <style>
+            
+     .watermark {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        opacity: 0.5; /* Transparansi (0.1 - 1.0) */
+        z-index: 9999;
+        color: #64748b; /* Warna abu-abu slate */
+        font-size: 0.9rem;
+        pointer-events: none; /* Supaya tetap bisa ngeklik tombol di bawahnya */
+        font-family: 'Inter', sans-serif;
+        font-weight: bold;
+    }       
     /* 1. & 2. (Tetap seperti kode Anda) */
     .main { background-color: #0f172a; }
     .report-card { 
@@ -127,6 +141,13 @@ def parse_rp(text):
     """Membersihkan teks format Rp agar jadi angka murni (int)"""
     clean = "".join(filter(str.isdigit, str(text)))
     return int(clean) if clean else 0
+
+def get_idx(options, state_key, default_idx=0):
+    """Mencari posisi index kata berdasarkan session state secara aman"""
+    val = st.session_state.get(state_key)
+    if val in options:
+        return options.index(val)
+    return default_idx
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
@@ -243,52 +264,52 @@ tab_cap, tab_char, tab_cond, tab_coll, tab_capi, tab_risk = st.tabs([
 
 
 # --- JSON IMPORTER (AUTO-FILL FEATURE) ---
-with st.sidebar.expander("📥 Import Data dari JSON"):
-    json_input_raw = st.text_area("Paste JSON Payload di sini:")
-    if st.button("Load Data JSON"):
-        try:
-            input_data = json.loads(json_input_raw)
-            payload = input_data.get('payload', input_data) # Support format wrap atau direct
+# with st.sidebar.expander("📥 Import Data dari JSON"):
+#     json_input_raw = st.text_area("Paste JSON Payload di sini:")
+#     if st.button("Load Data JSON"):
+#         try:
+#             input_data = json.loads(json_input_raw)
+#             payload = input_data.get('payload', input_data) # Support format wrap atau direct
             
-            # 1. Simpan ke Session State untuk Kapasitas
+#             # 1. Simpan ke Session State untuk Kapasitas
          
-            capa_main = payload['scoring']['capa'][0]
-            st.session_state['total_penghasilan'] = capa_main.get('total_penghasilan', 0)
-            st.session_state['pengeluaran_usaha'] = capa_main.get('total_pengeluaran_usaha', 0)
-            st.session_state['p_rt_murni'] = capa_main.get('pengeluaran_rumah_tangga', 0) # <--- MAPPING BARU
-            st.session_state['p_sekolah'] = capa_main.get('pengeluaran_sekolah', 0)
-            st.session_state['p_transport'] = capa_main.get('pengeluaran_transportasi', 0)
-            st.session_state['p_listrik'] = capa_main.get('pengeluaran_listrik', 0)
-            st.session_state['p_telepon'] = capa_main.get('pengeluaran_telepon', 0)
-            st.session_state['p_hutang'] = capa_main.get('pengeluaran_hutang', 0)
-            st.session_state['p_arisan'] = capa_main.get('pengeluaran_arisan', 0)
-            st.session_state['angs_diambil_val'] = capa_main.get('angs_diambil', 0)
+#             capa_main = payload['scoring']['capa'][0]
+#             st.session_state['total_penghasilan'] = capa_main.get('total_penghasilan', 0)
+#             st.session_state['pengeluaran_usaha'] = capa_main.get('total_pengeluaran_usaha', 0)
+#             st.session_state['p_rt_murni'] = capa_main.get('pengeluaran_rumah_tangga', 0) # <--- MAPPING BARU
+#             st.session_state['p_sekolah'] = capa_main.get('pengeluaran_sekolah', 0)
+#             st.session_state['p_transport'] = capa_main.get('pengeluaran_transportasi', 0)
+#             st.session_state['p_listrik'] = capa_main.get('pengeluaran_listrik', 0)
+#             st.session_state['p_telepon'] = capa_main.get('pengeluaran_telepon', 0)
+#             st.session_state['p_hutang'] = capa_main.get('pengeluaran_hutang', 0)
+#             st.session_state['p_arisan'] = capa_main.get('pengeluaran_arisan', 0)
+#             st.session_state['angs_diambil_val'] = capa_main.get('angs_diambil', 0)
             
-            # 2. Simpan Data Agunan (CRUD)
-            st.session_state.collaterals = []
-            for item in payload['scoring'].get('coll_agunan', []):
-                new_asset = {
-                    "unit_name": item.get('unit_name'),
-                    "address": item.get('address', item.get('desc')),
-                    "lt": item.get('luas_tanah', 0),
-                    "lb": item.get('luas_bangunan', 0),
-                    "merk": item.get('merk', ""),
-                    "thn": item.get('tahun', 2020),
-                    "hrg": item.get('harga', 0),
-                }
-                # Mapping scores agunan
-                for s in item.get('scores', []):
-                    if s['group'] == 'proses_aset': new_asset['proses_aset'] = s['value']
-                    if s['group'] == 'akses_jalan_roda_4': new_asset['akses_jalan'] = s['value']
-                    if s['group'] == 'domisili': new_asset['domisili'] = s['value']
-                    if s['group'] == 'kepemilikan_aset': new_asset['kepemilikan'] = s['value']
+#             # 2. Simpan Data Agunan (CRUD)
+#             st.session_state.collaterals = []
+#             for item in payload['scoring'].get('coll_agunan', []):
+#                 new_asset = {
+#                     "unit_name": item.get('unit_name'),
+#                     "address": item.get('address', item.get('desc')),
+#                     "lt": item.get('luas_tanah', 0),
+#                     "lb": item.get('luas_bangunan', 0),
+#                     "merk": item.get('merk', ""),
+#                     "thn": item.get('tahun', 2020),
+#                     "hrg": item.get('harga', 0),
+#                 }
+#                 # Mapping scores agunan
+#                 for s in item.get('scores', []):
+#                     if s['group'] == 'proses_aset': new_asset['proses_aset'] = s['value']
+#                     if s['group'] == 'akses_jalan_roda_4': new_asset['akses_jalan'] = s['value']
+#                     if s['group'] == 'domisili': new_asset['domisili'] = s['value']
+#                     if s['group'] == 'kepemilikan_aset': new_asset['kepemilikan'] = s['value']
                 
-                st.session_state.collaterals.append(new_asset)
+#                 st.session_state.collaterals.append(new_asset)
             
-            st.success("Data berhasil di-load! Silakan cek setiap Tab.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Format JSON salah: {e}")
+#             st.success("Data berhasil di-load! Silakan cek setiap Tab.")
+#             st.rerun()
+#         except Exception as e:
+#             st.error(f"Format JSON salah: {e}")
 
 # --- UPDATE SIDEBAR ---
 st.sidebar.markdown("---")
@@ -297,7 +318,7 @@ val_credit_check = st.sidebar.number_input("Skor Credit Checking (SLIK/OJK)", va
 
 # --- MASTER PARAMETER LIST ---
 PARAM_FIELDS = {
-    'total_penghasilan': 'Total Penghasilan',
+    # 'total_penghasilan': 'Total Penghasilan',
     'pengeluaran_usaha': 'Total Pengeluaran Usaha (Non-Beban)',
     'p_rt_murni': 'Total Biaya Rumah Tangga',
     'p_sekolah': 'Biaya Sekolah',
@@ -342,6 +363,35 @@ with st.sidebar:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config_to_save, f, indent=4)
         st.success("Konfigurasi Berhasil Disimpan!")
+
+        # --- MODUL AUTOMATION DI SIDEBAR ---
+with st.sidebar:
+    st.markdown("---")
+    st.header("🤖 Robot Automation")
+    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
+    
+    # Ambil list nama skenario dari file automation.py
+    scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
+    selected_mode = st.selectbox("Pilih Skenario Audit", scenarios)
+    
+    if selected_mode != "Manual Input":
+        if st.button("🚀 Jalankan Auto-Fill"):
+            if apply_automation(selected_mode):
+                st.success(f"Berhasil memuat profil: {selected_mode}")
+                # Paksa rerun agar input di Tab Capacity berubah otomatis
+                st.rerun()
+
+with st.sidebar:
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style='text-align: center; color: #64748b; font-size: 0.8rem;'>
+            Audit Tool v1.0<br>
+            <b>© 2026 M. Suparman</b>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
 
 with tab_risk:
     st.subheader("📋 Master Matrix Risiko")
@@ -425,7 +475,7 @@ with tab_cap:
         # Gunakan p_rt_murni_calc (angka), JANGAN p_rt_murni (teks)
        # Di tab_cap, pastiin dictionary ini lengkap semua key-nya
         current_vals = {
-            'total_penghasilan': total_penghasilan, 
+            # 'total_penghasilan': total_penghasilan, 
             'pengeluaran_usaha': pengeluaran_usaha,
             'p_rt_murni': p_rt_murni_calc, 
             'p_sekolah': p_sekolah,
@@ -445,7 +495,7 @@ with tab_cap:
         angs_diambil = st.number_input("Angsuran yang Akan Diambil", value=st.session_state.get('angs_diambil_val', 0))
 
     with c2:
-       # 1. LOGIKA PERHITUNGAN (Kebijakan vs Aktual)
+        # 1. PERHITUNGAN DASAR (Kebijakan vs Aktual)
         # Total beban aktual adalah Angsuran Baru + Beban yang dipilih di settings
         total_beban_aktual = angs_diambil + beban_idir
         plafon_maks_kebijakan = (total_penghasilan * params_max_angs_diambil / 100)
@@ -461,15 +511,19 @@ with tab_cap:
         
         st.markdown("---")
 
-        # 2. INDIKATOR BAR VISUAL (Koreksi Slider)
+        # 2. INDIKATOR BAR VISUAL (Koreksi Logika)
         st.write(f"**Pemanfaatan Kuota Angsuran ({params_max_angs_diambil}%)**")
         
-        # Logika Warna: Merah jika beban melebihi plafon kebijakan
+        # Hitung rasio untuk bar (0.0 sampai 1.0)
         rasio_pemanfaatan = total_beban_aktual / plafon_maks_kebijakan if plafon_maks_kebijakan > 0 else 0
+        
+        # Warna bar berubah merah jika beban melebihi plafon (Overlimit)
         bar_color = "#22c55e" if rasio_pemanfaatan <= 1.0 else "#ef4444"
         bar_label = "AMAN" if rasio_pemanfaatan <= 1.0 else "OVERLIMIT"
         
-        st.progress(min(rasio_pemanfaatan, 1.0))
+        # Progress bar hanya menerima angka 0.0 sampai 1.0. 
+        # min(rasio, 1.0) memastikan bar tidak error kalau lebih dari 100%
+        st.progress(min(max(rasio_pemanfaatan, 0.0), 1.0))
 
         # 3. CATATAN AUDITOR (Box Informasi Ala OJK)
         st.markdown(f"""
@@ -491,18 +545,32 @@ with tab_cap:
 
         st.markdown("---")
 
-        # 4. UPDATE DATA UNTUK PROSES AUDIT & INPUT TAMBAHAN
-        # Menambahkan unique key pada setiap input agar aman di hosting
+        # 4. INPUT WIDGETS (Agar sinkron dengan Robot Automation)
+        # Gunakan session_state.get agar input berubah otomatis saat robot jalan
+        tenor_val = st.number_input("Tenor (Bulan)", value=int(st.session_state.get('cap_tenor', 30)), key="cap_tenor")
+        usia_val = st.number_input("Usia", value=int(st.session_state.get('cap_usia', 41)), key="cap_usia")
+        kerja_val = st.number_input("Lama Kerja (Tahun)", value=float(st.session_state.get('cap_work', 3.0)), key="cap_work")
+
+        opts_merit = get_options_safe('status_perkawinan')
+        merit_val = st.selectbox("Status Perkawinan", opts_merit, index=get_idx(opts_merit, 'cap_merit'), key="cap_merit_ui")
+
+        opts_power = get_options_safe('daya_listrik')
+        power_val = st.selectbox("Daya Listrik", opts_power, index=get_idx(opts_power, 'cap_power'), key="cap_power_ui")
+
+        opts_period = get_options_safe('periode_penghasilan')
+        period_val = st.selectbox("Periode Penghasilan", opts_period, index=get_idx(opts_period, 'cap_period'), key="cap_period_ui")
+
+        # 5. UPDATE DATA UNTUK PROSES AUDIT
         user_inputs.update({
             'dsr': dsr_val, 
             'idir': idir_val, 
             'jlh_penghasilan': total_penghasilan,
-            'tenor': st.number_input("Tenor (Bulan)", value=30, key="cap_tenor"),
-            'usia': st.number_input("Usia", value=41, key="cap_usia"),
-            'lama_kerja': st.number_input("Lama Kerja (Tahun)", value=3.0, key="cap_work"),
-            'status_perkawinan': st.selectbox("Status Perkawinan", get_options_safe('status_perkawinan'), key="cap_merit"),
-            'daya_listrik': st.selectbox("Daya Listrik", get_options_safe('daya_listrik'), key="cap_power"),
-            'periode_penghasilan': st.selectbox("Periode Penghasilan", get_options_safe('periode_penghasilan'), key="cap_period")
+            'tenor': tenor_val,
+            'usia': usia_val,
+            'lama_kerja': kerja_val,
+            'status_perkawinan': merit_val,
+            'daya_listrik': power_val,
+            'periode_penghasilan': period_val
         })
 
         with st.expander("💡 Info Logika Slider"):
@@ -516,14 +584,19 @@ with tab_char:
     st.subheader("CHARACTER")
     c1, c2 = st.columns(2)
     with c1:
-        user_inputs['tujuan_pinjaman'] = st.selectbox("Tujuan Pinjaman", get_options_safe('tujuan_pinjaman'))
+        # Tujuan Pinjaman
+        opts_tujuan = get_options_safe('tujuan_pinjaman')
+        user_inputs['tujuan_pinjaman'] = st.selectbox("Tujuan Pinjaman", opts_tujuan, 
+                                                     index=get_idx(opts_tujuan, 'char_tujuan'), 
+                                                     key="char_tujuan_ui")
         show_point('tujuan_pinjaman', user_inputs['tujuan_pinjaman'])
         
         # --- MERGED STATUS DROPDOWN ---
         list_status = get_options_safe('tanpa_agunan') + get_options_safe('dengan_agunan')
-        selected_status = st.selectbox("Status Kolektibilitas", list_status)
+        selected_status = st.selectbox("Status Kolektibilitas", list_status, 
+                                      index=get_idx(list_status, 'char_kolektibilitas'), 
+                                      key="char_kol_ui")
         
-        # Logic Point Inheritance
         if selected_status in get_options_safe('tanpa_agunan'):
             inherited_point = find_point('tanpa_agunan', selected_status)
         else:
@@ -532,21 +605,36 @@ with tab_char:
         user_inputs['status'] = selected_status
         st.markdown(f"<small style='color: #007bff;'>Poin Status: <b>{inherited_point}</b></small>", unsafe_allow_html=True)
         
-        # --- INSTITUSI (Inherit Point) ---
         user_inputs['intitusi'] = st.text_input("Institusi Keuangan", value="Modal Usaha")
         st.session_state['point_institusi'] = inherited_point 
         st.markdown(f"<small style='color: green;'>Poin Institusi (Auto Match Status): <b>{inherited_point}</b></small>", unsafe_allow_html=True)
         
     with c2:
-        for f, l in zip(['lama_tinggal', 'kepemilikan_no_hp', 'asuransi_kesehatan', 'hubungan_bank', 'kartu_kredit', 'bayar_telepon', 'bayar_listrik', 'sisa_hutang'], 
-                        ["Lama Tinggal", "Lama No HP", "Asuransi Kesehatan", "Hubungan Bank", "Kartu Kredit", "Telepon", "Listrik", "Sisa Hutang"]):
-            user_inputs[f] = st.selectbox(l, get_options_safe(f), key=f"char_{f}")
+        # List field dan label
+        fields = ['lama_tinggal', 'kepemilikan_no_hp', 'asuransi_kesehatan', 'hubungan_bank', 'kartu_kredit', 'bayar_telepon', 'bayar_listrik', 'sisa_hutang']
+        labels = ["Lama Tinggal", "Lama No HP", "Asuransi Kesehatan", "Hubungan Bank", "Kartu Kredit", "Telepon", "Listrik", "Sisa Hutang"]
+        
+        # Mapping key dari automation.py
+        auto_keys = ['char_lama_tinggal', 'char_hp', 'char_asuransi', 'char_hubungan', 'char_kartu', 'char_telp_bayar', 'char_listrik_bayar', 'char_sisa_hutang']
+
+        for f, l, ak in zip(fields, labels, auto_keys):
+            opts = get_options_safe(f)
+            user_inputs[f] = st.selectbox(l, opts, index=get_idx(opts, ak), key=f"char_{f}_ui")
             show_point(f, user_inputs[f])
+            
 
 with tab_cond:
     st.subheader("CONDITION")
-    for f in ['pekerjaan', 'jenis_aset', 'kepemilikan_aset']:
-        user_inputs[f] = st.selectbox(f.replace('_', ' ').title(), get_options_safe(f))
+    # Mapping field dan key automation
+    cond_mapping = {
+        'pekerjaan': ('Pekerjaan', 'cond_job'),
+        'jenis_aset': ('Jenis Aset', 'cond_asset'),
+        'kepemilikan_aset': ('Kepemilikan Aset', 'cond_own')
+    }
+    
+    for f, (label, ak) in cond_mapping.items():
+        opts = get_options_safe(f)
+        user_inputs[f] = st.selectbox(label, opts, index=get_idx(opts, ak), key=f"cond_{f}_ui")
         show_point(f, user_inputs[f])
 
 with tab_coll:
@@ -562,10 +650,17 @@ with tab_coll:
     for i, col_item in enumerate(st.session_state.collaterals):
         with st.expander(f"📌 Agunan Ke-{i+1}: {col_item['unit_name']}", expanded=True):
             c1, c2 = st.columns(2)
+            
+            # --- JENIS AGUNAN ---
             unit_opts = ["Rumah", "Tanah", "Ruko", "Mobil", "Motor"]
-            col_item['unit_name'] = c1.selectbox(f"Jenis Agunan #{i}", unit_opts, 
-                                                index=unit_opts.index(col_item['unit_name']) if col_item['unit_name'] in unit_opts else 0,
-                                                key=f"unit_{i}")
+            idx_unit = unit_opts.index(col_item['unit_name']) if col_item['unit_name'] in unit_opts else 0
+            
+            col_item['unit_name'] = c1.selectbox(f"Jenis Agunan #{i}", unit_opts, index=idx_unit, key=f"unit_{i}")
+            
+            # TAMPILKAN POIN UNIT
+            p_unit = find_point('agunan', col_item['unit_name'])
+            c1.markdown(f"<small style='color: #eab308;'>Poin Jenis Agunan: <b>{p_unit}</b></small>", unsafe_allow_html=True)
+            
             col_item['address'] = c2.text_input(f"Alamat/Lokasi #{i}", value=col_item.get('address') or "", key=f"addr_{i}")
             
             # --- LOGIKA FIELD TEKNIS ---
@@ -574,30 +669,85 @@ with tab_coll:
                 col_item['lb'] = c2.number_input(f"Luas Bangunan #{i}", value=int(col_item.get('lb') or 0), key=f"lb_{i}")
             elif col_item['unit_name'] == "Tanah":
                 col_item['lt'] = c1.number_input(f"Luas Tanah #{i}", value=int(col_item.get('lt') or 0), key=f"lt_{i}")
-                col_item['lb'] = 0 # Tanah tidak punya bangunan
+                col_item['lb'] = 0
             else: # Kendaraan
                 col_item['merk'] = c1.text_input(f"Merk/Tipe #{i}", value=col_item.get('merk') or "", key=f"merk_{i}")
                 col_item['thn'] = c2.number_input(f"Tahun #{i}", value=int(col_item.get('thn') or 2020), key=f"thn_{i}")
                 col_item['hrg'] = c2.number_input(f"Estimasi Harga #{i}", value=int(col_item.get('hrg') or 0), key=f"hrg_{i}")
 
-            st.write("**--- Scoring Detail ---**")
+            st.markdown("---")
+            st.write("**📝 Scoring Detail**")
             s1, s2, s3 = st.columns(3)
-            def get_choice_idx(opts, val): return opts.index(val) if val in opts else 0
 
-            col_item['proses_aset'] = s1.selectbox(f"Proses Aset #{i}", get_options_safe('proses_aset'), index=get_choice_idx(get_options_safe('proses_aset'), col_item.get('proses_aset')), key=f"pr_{i}")
-            col_item['domisili'] = s2.selectbox(f"Sesuai KTP #{i}", get_options_safe('domisili'), index=get_choice_idx(get_options_safe('domisili'), col_item.get('domisili')), key=f"dm_{i}")
-            col_item['kepemilikan'] = s3.selectbox(f"Kepemilikan #{i}", get_options_safe('kepemilikan_aset'), index=get_choice_idx(get_options_safe('kepemilikan_aset'), col_item.get('kepemilikan')), key=f"kp_{i}")
+            # Helper internal untuk index
+            def get_col_idx(opts, current_val):
+                return opts.index(current_val) if current_val in opts else 0
+
+            # 1. PROSES ASET
+            opt_proses = get_options_safe('proses_aset')
+            col_item['proses_aset'] = s1.selectbox(f"Proses Aset #{i}", opt_proses, 
+                                                  index=get_col_idx(opt_proses, col_item.get('proses_aset')), 
+                                                  key=f"pr_{i}")
+            p_proses = find_point('proses_aset', col_item['proses_aset'])
+            s1.markdown(f"<small style='color: #3b82f6;'>Poin: <b>{p_proses}</b></small>", unsafe_allow_html=True)
             
-            # --- LOGIKA LINGKUNGAN: Hanya untuk Aset Tetap ---
+            # 2. DOMISILI (SESUAI KTP)
+            opt_dom = get_options_safe('domisili')
+            col_item['domisili'] = s2.selectbox(f"Sesuai KTP #{i}", opt_dom, 
+                                               index=get_col_idx(opt_dom, col_item.get('domisili')), 
+                                               key=f"dm_{i}")
+            p_dom = find_point('domisili', col_item['domisili'])
+            s2.markdown(f"<small style='color: #3b82f6;'>Poin: <b>{p_dom}</b></small>", unsafe_allow_html=True)
+            
+            # 3. KEPEMILIKAN
+            opt_own = get_options_safe('kepemilikan_aset')
+            col_item['kepemilikan'] = s3.selectbox(f"Kepemilikan #{i}", opt_own, 
+                                                  index=get_col_idx(opt_own, col_item.get('kepemilikan')), 
+                                                  key=f"kp_{i}")
+            p_own = find_point('kepemilikan_aset', col_item['kepemilikan'])
+            s3.markdown(f"<small style='color: #3b82f6;'>Poin: <b>{p_own}</b></small>", unsafe_allow_html=True)
+
+            # --- LOGIKA LINGKUNGAN (KHUSUS PROPERTI) ---
+            p_env_total = 0
             if col_item['unit_name'] in ["Rumah", "Tanah", "Ruko"]:
-                col_item['akses_jalan'] = s1.selectbox(f"Akses Roda 4 #{i}", get_options_safe('akses_jalan_roda_4'), index=get_choice_idx(get_options_safe('akses_jalan_roda_4'), col_item.get('akses_jalan')), key=f"ak_{i}")
-                col_item['kuburan'] = s2.selectbox(f"Ada Kuburan? #{i}", get_options_safe('dalam_200m_terdapat_kuburan'), index=get_choice_idx(get_options_safe('dalam_200m_terdapat_kuburan'), col_item.get('kuburan')), key=f"kb_{i}")
-                col_item['sutet'] = s3.selectbox(f"Ada Sutet? #{i}", get_options_safe('dalam_200m_terdapat_sutet'), index=get_choice_idx(get_options_safe('dalam_200m_terdapat_sutet'), col_item.get('sutet')), key=f"st_{i}")
-                col_item['sungai'] = s1.selectbox(f"Ada Sungai? #{i}", get_options_safe('dalam_200m_terdapat_sungai'), index=get_choice_idx(get_options_safe('dalam_200m_terdapat_sungai'), col_item.get('sungai')), key=f"sg_{i}")
+                st.write("**🏘️ Kondisi Lingkungan**")
+                env1, env2, env3 = st.columns(3)
+                env4, _, _ = st.columns(3)
+
+                # Akses Jalan
+                opt_jln = get_options_safe('akses_jalan_roda_4')
+                col_item['akses_jalan'] = env1.selectbox(f"Akses Roda 4 #{i}", opt_jln, index=get_col_idx(opt_jln, col_item.get('akses_jalan')), key=f"ak_{i}")
+                p_jln = find_point('akses_jalan_roda_4', col_item['akses_jalan'])
+                env1.markdown(f"<small style='color: #64748b;'>Poin: {p_jln}</small>", unsafe_allow_html=True)
+                
+                # Kuburan
+                opt_kbr = get_options_safe('dalam_200m_terdapat_kuburan')
+                col_item['kuburan'] = env2.selectbox(f"Ada Kuburan? #{i}", opt_kbr, index=get_col_idx(opt_kbr, col_item.get('kuburan')), key=f"kb_{i}")
+                p_kbr = find_point('dalam_200m_terdapat_kuburan', col_item['kuburan'])
+                env2.markdown(f"<small style='color: #64748b;'>Poin: {p_kbr}</small>", unsafe_allow_html=True)
+
+                # Sutet
+                opt_stt = get_options_safe('dalam_200m_terdapat_sutet')
+                col_item['sutet'] = env3.selectbox(f"Ada Sutet? #{i}", opt_stt, index=get_col_idx(opt_stt, col_item.get('sutet')), key=f"st_{i}")
+                p_stt = find_point('dalam_200m_terdapat_sutet', col_item['sutet'])
+                env3.markdown(f"<small style='color: #64748b;'>Poin: {p_stt}</small>", unsafe_allow_html=True)
+
+                # Sungai
+                opt_sng = get_options_safe('dalam_200m_terdapat_sungai')
+                col_item['sungai'] = env4.selectbox(f"Ada Sungai? #{i}", opt_sng, index=get_col_idx(opt_sng, col_item.get('sungai')), key=f"sg_{i}")
+                p_sng = find_point('dalam_200m_terdapat_sungai', col_item['sungai'])
+                env4.markdown(f"<small style='color: #64748b;'>Poin: {p_sng}</small>", unsafe_allow_html=True)
+                
+                p_env_total = p_jln + p_kbr + p_stt + p_sng
             else:
-                # Default untuk kendaraan (Hapus data lingkungan agar JSON bersih)
+                # Kendaraan tidak dapet poin lingkungan
                 col_item['akses_jalan'] = "YA"; col_item['kuburan'] = "TIDAK"
                 col_item['sutet'] = "TIDAK"; col_item['sungai'] = "TIDAK"
+                p_env_total = 0
+
+            # RINGKASAN POIN AGUNAN INI
+            total_agunan_i = p_unit + p_proses + p_dom + p_own + p_env_total
+            st.info(f"Sub-Total Poin Agunan #{i+1}: **{total_agunan_i}**")
 
             if st.button(f"🗑️ Hapus Agunan #{i+1}", key=f"del_{i}"):
                 st.session_state.collaterals.pop(i)
@@ -605,8 +755,15 @@ with tab_coll:
 
 with tab_capi:
     st.subheader("CAPITAL")
-    for f in ['kepemilikan_rumah', 'perumahan', 'tipe_rumah']:
-        user_inputs[f] = st.selectbox(f.replace('_', ' ').title(), get_options_safe(f))
+    capi_mapping = {
+        'kepemilikan_rumah': ('Kepemilikan Rumah', 'capi_rumah'),
+        'perumahan': ('Perumahan', 'capi_perumahan'),
+        'tipe_rumah': ('Tipe Rumah', 'capi_tipe')
+    }
+    
+    for f, (label, ak) in capi_mapping.items():
+        opts = get_options_safe(f)
+        user_inputs[f] = st.selectbox(label, opts, index=get_idx(opts, ak), key=f"capi_{f}_ui")
         show_point(f, user_inputs[f])
 
   # --- MASTER BOBOT HARDCODE ---
@@ -633,46 +790,79 @@ if st.session_state.audit_run:
     prod_id = str(selected_id_produk).strip()
     cat_weight_map = WEIGHT_CONFIG.get(prod_id, WEIGHT_CONFIG["002"])
 
-    # RE-CALCULATE VARIABLES (Agar tidak NameError)
-    # Kita hitung ulang di sini supaya variabel tersedia untuk JSON & Stress Test
+    # 1. RE-CALCULATE VARIABLES
     current_vals_murni = {
         'p_rt_murni': p_rt_murni_calc, 'p_sekolah': p_sekolah,
         'p_transport': p_transport, 'p_listrik': p_listrik,
         'p_telepon': p_telepon, 'p_hutang': p_hutang, 'p_arisan': p_arisan
     }
     
-    # Ambil angka beban dari setting sidebar
     beban_idir_audit = sum(current_vals_murni.get(p, 0) for p in selected_idir)
     total_beban_aktual_audit = angs_diambil + beban_idir_audit
-    
-    # Hitung Maks Angsuran (Variable yang tadi error)
     maksAngsuran_audit = (total_penghasilan * params_max_angs_diambil / 100) - beban_idir_audit
 
     details = []
     rules_table = df_hitung[df_hitung['id_produk'] == selected_id_produk]
     
+    # 2. LOOP PILAR (Capacity, Character, Condition, Capital)
     for _, row in rules_table.iterrows():
         f_name = row['group']
         if f_name in active_scoring_fields:
-            p = find_point(f_name, user_inputs.get(f_name, 0))
+            # Gunakan .strip() agar spasi gaib tidak bikin skor 0
+            val_input = str(user_inputs.get(f_name, "")).strip()
+            p = find_point(f_name, val_input)
             w = row['bobot']
         else:
             p, w = 0, 0
         details.append({'Category': str(row['score_type']).lower().strip(), 'Field': f_name, 'Point': p, 'Weight': w, 'Weighted': p * w})
 
-    # PROSES SUMMARY
+    # 3. MASUKKAN POIN COLLATERAL (YANG TADI HILANG)
+   # 3. MASUKKAN POIN COLLATERAL (LOGIKA BARU - TANPA ANGKA GAIB)
+    total_p_coll = 0
+    for asset in st.session_state.collaterals:
+        # Poin dasar
+        p_u = find_point('agunan', asset.get('unit_name'))
+        p_p = find_point('proses_aset', asset.get('proses_aset'))
+        p_d = find_point('domisili', asset.get('domisili'))
+        p_k = find_point('kepemilikan_aset', asset.get('kepemilikan'))
+        
+        # Poin lingkungan rill (Hanya jika Rumah/Tanah/Ruko)
+        p_env = 0
+        if asset.get('unit_name') in ["Rumah", "Tanah", "Ruko"]:
+            p_env += find_point('akses_jalan_roda_4', asset.get('akses_jalan'))
+            p_env += find_point('dalam_200m_terdapat_kuburan', asset.get('kuburan'))
+            p_env += find_point('dalam_200m_terdapat_sutet', asset.get('sutet'))
+            p_env += find_point('dalam_200m_terdapat_sungai', asset.get('sungai'))
+        
+        # Total rill per agunan
+        total_p_coll += (p_u + p_p + p_d + p_k + p_env)
+
+    # Masukkan ke list details untuk summary
+    # Kita set bobot ke 1.0 karena pembobotan produk dilakukan di langkah berikutnya
+    details.append({
+        'Category': 'collateral', 
+        'Field': 'dynamic_collateral', 
+        'Value': f"{len(st.session_state.collaterals)} Assets",
+        'Point': total_p_coll, 
+        'Weight': 1.0, 
+        'Weighted': total_p_coll
+    })
+
+    # 4. PROSES SUMMARY & SKOR FINAL
     df_res = pd.DataFrame(details)
     summary = df_res.groupby('Category').agg({'Point': 'sum', 'Weighted': 'sum'}).reset_index()
     summary['Cat_Weight'] = summary['Category'].map(cat_weight_map).fillna(0)
+    
+    # RUMUS BE: (Total Poin Kategori * Bobot Produk) * 100
     summary['Skor_BE'] = summary['Weighted'] * summary['Cat_Weight'] * 100
     total_be_score = round(summary['Skor_BE'].sum(), 0)
 
     # LOOKUP RISIKO
-    final_risk_data = next((risk for risk in MASTER_RISIKO_SCORE if risk['range_score']['min'] <= total_be_score <= risk['range_score']['max'] and risk['range_score_credit_checking']['min'] <= val_credit_check <= risk['range_score_credit_checking']['max']), {"nama_risiko": "Manual Review", "deskripsi": "Skor diluar jangkauan."})
+    final_risk_data = next((risk for risk in MASTER_RISIKO_SCORE if risk['range_score']['min'] <= total_be_score <= risk['range_score']['max'] and risk['range_score_credit_checking']['min'] <= val_credit_check <= risk['range_score_credit_checking']['max']), {"nama_risiko": "Manual Review", "level": "N/A", "deskripsi": "Skor diluar jangkauan."})
     color_map = {"Risiko Rendah": "#22c55e", "Risiko Sedang": "#eab308", "Risiko Tinggi": "#ef4444", "Reject": "#ef4444"}
     risk_color = color_map.get(final_risk_data['nama_risiko'], "#3b82f6")
+    
 
-    # --- FITUR: SCORING SENSITIVITY (STRESS TEST) ---
     # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
     st.markdown("---")
     st.subheader("🔍 Stress Test: Sensitivity Analysis")
@@ -726,7 +916,7 @@ if st.session_state.audit_run:
     # --- UI OUTPUT (REPORT CARD) ---
     st.divider()
     st.markdown(f"""
-        <div class="report-card">
+        <div class="report-card" style="border-left: 8px solid {risk_color};">
             <h3 style='margin:0; color:#e2e8f0;'>HASIL ANALISA RISIKO</h3>
             <h1 style='color:{risk_color}; margin:10px 0;'>{final_risk_data['nama_risiko']}</h1>
             <p style='color:#94a3b8;'>Skor Akhir: <b style='color:white; font-size:24px;'>{total_be_score}</b></p>
@@ -735,7 +925,6 @@ if st.session_state.audit_run:
         </div>
     """, unsafe_allow_html=True)
 
-    # TAMPILKAN TABEL SUMMARY
     summary_display = summary.copy()
     summary_display['Total Poin'] = summary_display['Point'].astype(int)
     summary_display['Weighted Subtotal'] = summary_display['Weighted'].map("{:,.2f}".format)
