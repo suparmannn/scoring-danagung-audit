@@ -1,6 +1,6 @@
 # instal librari: pip install pandas streamlit openpyxl
 # cara run: streamlit run scoring.py
-
+import json
 import streamlit as st
 import pandas as pd
 import os
@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime
 from automation import apply_automation, get_scenario_presets
 from streamlit_lottie import st_lottie
-import requests
+# import requests
 
 st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
 
@@ -37,6 +37,18 @@ st.markdown("""
         border-radius: 20px;
         border: 1px solid #eab308;
     }     
+            .footer-watermark {
+        position: fixed;
+        bottom: 10px;
+        right: 20px;
+        color: #eab308; /* Warna Gold */
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 0.85rem;
+        font-weight: bold;
+        opacity: 0.6;
+        z-index: 100;
+        letter-spacing: 1px;
+    }
     /* 1. & 2. (Tetap seperti kode Anda) */
     .main { background-color: #0f172a; }
     .report-card { 
@@ -383,37 +395,22 @@ with st.sidebar:
 
         # --- MODUL AUTOMATION DI SIDEBAR ---
 # 1. Fungsi load yang lebih aman
-def load_lottieurl(url):
-    try:
-        r = requests.get(url, timeout=10)
-        # Jika bukan JSON atau error, jangan diproses
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except:
-        return None
+def load_lottie_local(filepath: str):
+    with open(filepath, "r") as f:
+        return json.load(f)
 
-# 2. Gunakan link Lottie yang lebih stabil (URL CDN)
-# Ini animasi robot asisten yang sedang bekerja
-# --- DI BAGIAN LOAD ANIMASI ---
-lottie_url = "https://assets5.lottiefiles.com/packages/lf20_gb5bmaym.json"
-lottie_robot = load_lottieurl(lottie_url)
+# Load animasi dari file yang Bapak upload ke GitHub tadi
+lottie_robot = load_lottie_local("robot.json")
 
 with st.sidebar:
     st.markdown("---")
     st.header("🤖 Robot Automation")
     
-    # CEK: Hanya jalankan st_lottie kalau datanya ADA (bukan None)
+    # Sekarang pasti muncul karena filenya ada di dalam server Bapak sendiri
     if lottie_robot:
-        st_lottie(lottie_robot, height=150, key="robot_anim")
-    else:
-        # Tampilan cadangan kalau internet hostingan Bapak lagi lemot
-        st.markdown("""
-            <div style="background:#1e293b; padding:20px; border-radius:10px; text-align:center;">
-                <span style="font-size:40px;">🤖</span><br>
-                <small style="color:#64748b;">Robot Engine Active</small>
-            </div>
-        """, unsafe_allow_html=True)
+        st_lottie(lottie_robot, height=150, key="robot_hosting")
+    
+    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
     
     # Ambil list nama skenario dari file automation.py
     scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
