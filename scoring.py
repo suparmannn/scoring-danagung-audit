@@ -1,6 +1,7 @@
 # instal librari: pip install pandas streamlit openpyxl
 # cara run: streamlit run scoring.py
 # import json
+# import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 import os
@@ -330,7 +331,7 @@ def show_point(group_name, value):
 # --- 3. UI INPUTS ---
 st.title("")
 selected_id_produk = st.sidebar.selectbox("Pilih ID Produk", df_hitung['id_produk'].unique())
-params_max_angs_diambil = st.sidebar.slider("Batas Max Angsuran (%)", 10, 100, 70)
+params_max_angs_diambil = st.sidebar.slider("Batas Max DSR (%)", 10, 70, 40, help="Standar perbankan aman di 30-40%")
 user_inputs = {}
 # # --- UPDATE TAB LIST ---
 # tab_cap, tab_char, tab_cond, tab_coll, tab_capi, tab_risk = st.tabs([
@@ -364,6 +365,38 @@ with header_col2:
 tab_cap, tab_char, tab_cond, tab_coll, tab_capi, tab_risk = st.tabs([
     "CAPACITY", "CHARACTER", "CONDITION", "COLLATERAL", "CAPITAL", "🛡️ RISK MASTER"
 ])
+
+
+        # --- MODUL AUTOMATION DI SIDEBAR ---
+# 1. Fungsi load yang lebih aman
+def load_lottie_local(filepath: str):
+    with open(filepath, "r") as f:
+        return json.load(f)
+
+# Load animasi dari file yang Bapak upload ke GitHub tadi
+lottie_robot = load_lottie_local("robot.json")
+
+with st.sidebar:
+    st.markdown("---")
+    st.header("🤖 Robot Automation")
+    
+    # Sekarang pasti muncul karena filenya ada di dalam server Bapak sendiri
+    if lottie_robot:
+        st_lottie(lottie_robot, height=150, key="robot_hosting")
+    
+    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
+    
+    # Ambil list nama skenario dari file automation.py
+    scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
+    selected_mode = st.selectbox("Pilih Skenario Audit", scenarios)
+    
+    if selected_mode != "Manual Input":
+        if st.button("🚀 Jalankan Auto-Fill"):
+            if apply_automation(selected_mode):
+                st.success(f"Berhasil memuat profil: {selected_mode}")
+                # Paksa rerun agar input di Tab Capacity berubah otomatis
+                st.rerun()
+
 
 
 # --- JSON IMPORTER (AUTO-FILL FEATURE) ---
@@ -466,37 +499,6 @@ with st.sidebar:
         with open(CONFIG_FILE, 'w') as f:
             json.dump(config_to_save, f, indent=4)
         st.success("Konfigurasi Berhasil Disimpan!")
-
-        # --- MODUL AUTOMATION DI SIDEBAR ---
-# 1. Fungsi load yang lebih aman
-def load_lottie_local(filepath: str):
-    with open(filepath, "r") as f:
-        return json.load(f)
-
-# Load animasi dari file yang Bapak upload ke GitHub tadi
-lottie_robot = load_lottie_local("robot.json")
-
-with st.sidebar:
-    st.markdown("---")
-    st.header("🤖 Robot Automation")
-    
-    # Sekarang pasti muncul karena filenya ada di dalam server Bapak sendiri
-    if lottie_robot:
-        st_lottie(lottie_robot, height=150, key="robot_hosting")
-    
-    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
-    
-    # Ambil list nama skenario dari file automation.py
-    scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
-    selected_mode = st.selectbox("Pilih Skenario Audit", scenarios)
-    
-    if selected_mode != "Manual Input":
-        if st.button("🚀 Jalankan Auto-Fill"):
-            if apply_automation(selected_mode):
-                st.success(f"Berhasil memuat profil: {selected_mode}")
-                # Paksa rerun agar input di Tab Capacity berubah otomatis
-                st.rerun()
-
 
 with st.sidebar:
     st.markdown("---")
@@ -625,53 +627,60 @@ with tab_cap:
         angs_diambil = st.number_input("Angsuran yang Akan Diambil", value=st.session_state.get('angs_diambil_val', 0))
 
     with c2:
-        # 1. PERHITUNGAN DASAR (Kebijakan vs Aktual)
-        # Total beban aktual adalah Angsuran Baru + Beban yang dipilih di settings
-        total_beban_aktual = angs_diambil + beban_idir
-        plafon_maks_kebijakan = (total_penghasilan * params_max_angs_diambil / 100)
-        sisa_kuota = plafon_maks_kebijakan - total_beban_aktual
-
-        # Hitung Nilai Persentase untuk Tampilan Metric
-        dsr_val = round((beban_dsr / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
-        idir_val = round((total_beban_aktual / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
+        # --- 1. RUMUS STANDAR PERBANKAN ---
+        # IDIR: Angsuran Baru / Pendapatan
+        idir_val = round((angs_diambil / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
         
-        # Tampilkan Metric Utama
-        st.metric("DSR (%)", f"{dsr_val}%", help="Hanya menghitung parameter beban lama yang dipilih di Settings")
-        st.metric("IDIR (%)", f"{idir_val}%", help="Menghitung angsuran baru + total beban pilihan di Settings")
+        # DSR: (Beban Hutang Lama + Angsuran Baru) / Pendapatan
+        total_cicilan_dsr = beban_dsr + angs_diambil
+        dsr_val = round((total_cicilan_dsr / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
+        
+        # --- 2. TAMPILAN METRIC UTAMA ---
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.metric("DSR (%)", f"{dsr_val}%", help="Rumus: (Beban Lama Terpilih + Angsuran Baru) / Pendapatan")
+        with col_m2:
+            st.metric("IDIR (%)", f"{idir_val}%", help="Rumus: Angsuran Baru / Pendapatan")
         
         st.markdown("---")
 
-        # 2. INDIKATOR BAR VISUAL (Koreksi Logika)
-        st.write(f"**Pemanfaatan Kuota Angsuran ({params_max_angs_diambil}%)**")
+      # --- 3. PROGRESS BAR & STATUS ---
+        st.write(f"**Pemanfaatan Kuota DSR ({params_max_angs_diambil}%)**")
+        plafon_maks_kebijakan = (total_penghasilan * params_max_angs_diambil / 100)
         
-        # Hitung rasio untuk bar (0.0 sampai 1.0)
-        rasio_pemanfaatan = total_beban_aktual / plafon_maks_kebijakan if plafon_maks_kebijakan > 0 else 0
+        rasio_pemanfaatan = total_cicilan_dsr / plafon_maks_kebijakan if plafon_maks_kebijakan > 0 else 0
         
-        # Warna bar berubah merah jika beban melebihi plafon (Overlimit)
-        bar_color = "#22c55e" if rasio_pemanfaatan <= 1.0 else "#ef4444"
-        bar_label = "AMAN" if rasio_pemanfaatan <= 1.0 else "OVERLIMIT"
+        # Logika Warna Aman/Warning/Reject
+        if rasio_pemanfaatan <= 0.8:
+            bar_color = "#22c55e" # Hijau
+            status_text = "AMAN"
+        elif rasio_pemanfaatan <= 1.0:
+            bar_color = "#eab308" # Kuning
+            status_text = "WARNING"
+        else:
+            bar_color = "#ef4444" # Merah
+            status_text = "OVERLIMIT / REJECT"
         
-        # Progress bar hanya menerima angka 0.0 sampai 1.0. 
-        # min(rasio, 1.0) memastikan bar tidak error kalau lebih dari 100%
         st.progress(min(max(rasio_pemanfaatan, 0.0), 1.0))
 
-        # 3. CATATAN AUDITOR (Box Informasi Ala OJK)
+        # --- 4. CATATAN VERIFIKASI ---
         st.markdown(f"""
-            <div style="background-color: #f1f5f9; padding: 15px; border-radius: 10px; border-left: 5px solid {bar_color}; margin-bottom: 20px;">
-                <p style="color: #475569; margin: 0; font-size: 0.8rem; font-weight: bold;">CATATAN VERIFIKASI:</p>
+            <div style="background-color: #f1f5f9; padding: 15px; border-radius: 10px; border-left: 8px solid {bar_color};">
+                <p style="color: #475569; margin: 0; font-size: 0.8rem; font-weight: bold;">ANALISA KAPASITAS:</p>
                 <p style="color: #1e293b; margin: 5px 0; font-size: 0.9rem;">
-                    • <b>Batas Plafon:</b> {format_rp(plafon_maks_kebijakan)} (Kebijakan {params_max_angs_diambil}%)<br>
-                    • <b>Total Beban:</b> {format_rp(total_beban_aktual)} (Aktual Pengeluaran)<br>
-                    • <b>Status Kapasitas:</b> <span style="color:{bar_color}; font-weight:bold;">{bar_label}</span>
+                    • <b>Batas Maksimal DSR:</b> {params_max_angs_diambil}%<br>
+                    • <b>DSR Aktual:</b> {dsr_val}%<br>
+                    • <b>Status:</b> <span style="color:{bar_color}; font-weight:bold;">{status_text}</span>
                 </p>
             </div>
         """, unsafe_allow_html=True)
 
-        # Menampilkan Sisa Kapasitas dengan visual warna
-        if sisa_kuota >= 0:
-            st.success(f"Sisa Kapasitas Angsuran (Maks): **{format_rp(sisa_kuota)}**")
+        # Disposable Income (Sisa uang setelah SEMUA pengeluaran)
+        sisa_uang_rill = total_penghasilan - (angs_diambil + beban_idir)
+        if sisa_uang_rill >= 0:
+            st.success(f"Sisa Disposable Income: **{format_rp(sisa_uang_rill)}**")
         else:
-            st.error(f"Defisit Kemampuan Bayar: **{format_rp(abs(sisa_kuota))}**")
+            st.error(f"Defisit Kemampuan Bayar: **{format_rp(abs(sisa_uang_rill))}**")
 
         st.markdown("---")
 
@@ -702,6 +711,8 @@ with tab_cap:
             'daya_listrik': power_val,
             'periode_penghasilan': period_val
         })
+
+
 
         with st.expander("💡 Info Logika Slider"):
             st.caption(f"""
@@ -1005,7 +1016,8 @@ if st.session_state.audit_run:
     income_stressed = total_penghasilan * (1 - (stress_factor / 100))
     
     # Hitung ulang DSR/IDIR di kondisi stress
-    idir_stressed = round((total_beban_aktual / income_stressed * 100), 2) if income_stressed > 0 else 0
+    # Gunakan total_cicilan_dsr (karena ini total beban hutang yang valid)
+    idir_stressed = round((total_cicilan_dsr / income_stressed * 100), 2) if income_stressed > 0 else 0
     
     # Hitung ulang Skor BE (Asumsi poin Kapasitas turun jika penghasilan turun)
     # Kita buat simulasi skor BE turun proporsional dengan faktor stress pada pilar Capacity
