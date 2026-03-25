@@ -385,28 +385,35 @@ with st.sidebar:
 # 1. Fungsi load yang lebih aman
 def load_lottieurl(url):
     try:
-        r = requests.get(url, timeout=5) # Tambah timeout agar tidak loading selamanya
+        r = requests.get(url, timeout=10)
+        # Jika bukan JSON atau error, jangan diproses
         if r.status_code != 200:
             return None
         return r.json()
-    except Exception:
+    except:
         return None
 
 # 2. Gunakan link Lottie yang lebih stabil (URL CDN)
 # Ini animasi robot asisten yang sedang bekerja
-lottie_url = "https://lottie.host/df23f81e-1512-4299-8080-87779d711019/3mOIrMshT8.json"
+# --- DI BAGIAN LOAD ANIMASI ---
+lottie_url = "https://assets5.lottiefiles.com/packages/lf20_gb5bmaym.json"
 lottie_robot = load_lottieurl(lottie_url)
 
-# 3. Sidebar dengan pengecekan NoneType
 with st.sidebar:
     st.markdown("---")
     st.header("🤖 Robot Automation")
     
-    # Hanya tampilkan animasi jika data berhasil diambil
+    # CEK: Hanya jalankan st_lottie kalau datanya ADA (bukan None)
     if lottie_robot:
-        st_lottie(lottie_robot, height=150, key="robot")
+        st_lottie(lottie_robot, height=150, key="robot_anim")
     else:
-        st.write("🤖") # Fallback pakai emoji jika internet/link bermasalah
+        # Tampilan cadangan kalau internet hostingan Bapak lagi lemot
+        st.markdown("""
+            <div style="background:#1e293b; padding:20px; border-radius:10px; text-align:center;">
+                <span style="font-size:40px;">🤖</span><br>
+                <small style="color:#64748b;">Robot Engine Active</small>
+            </div>
+        """, unsafe_allow_html=True)
     
     # Ambil list nama skenario dari file automation.py
     scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
