@@ -4,3 +4,4 @@ openpyxl
 requests
 streamlit-lottie
 numpy
+json
