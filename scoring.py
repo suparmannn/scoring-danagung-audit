@@ -8,6 +8,8 @@ import json
 import numpy as np
 from datetime import datetime
 from automation import apply_automation, get_scenario_presets
+from streamlit_lottie import st_lottie
+import requests
 
 st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
 
@@ -16,18 +18,25 @@ st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
 st.markdown("""
     <style>
             
-     .watermark {
+    @keyframes pulse {
+        0% { opacity: 0.5; transform: scale(1); }
+        50% { opacity: 0.8; transform: scale(1.05); text-shadow: 0 0 10px #eab308; }
+        100% { opacity: 0.5; transform: scale(1); }
+    }
+    .watermark {
         position: fixed;
-        bottom: 10px;
-        right: 10px;
-        opacity: 0.5; /* Transparansi (0.1 - 1.0) */
+        bottom: 20px;
+        right: 20px;
         z-index: 9999;
-        color: #64748b; /* Warna abu-abu slate */
-        font-size: 0.9rem;
-        pointer-events: none; /* Supaya tetap bisa ngeklik tombol di bawahnya */
-        font-family: 'Inter', sans-serif;
+        color: #eab308; /* Warna Gold Danagung */
+        font-family: 'Courier New', monospace;
         font-weight: bold;
-    }       
+        animation: pulse 3s infinite ease-in-out;
+        background: rgba(30, 41, 59, 0.7);
+        padding: 5px 15px;
+        border-radius: 20px;
+        border: 1px solid #eab308;
+    }     
     /* 1. & 2. (Tetap seperti kode Anda) */
     .main { background-color: #0f172a; }
     .report-card { 
@@ -67,6 +76,14 @@ st.markdown("""
         color: #eab308 !important;
         margin-bottom: 5px;
     }
+            
+            /* Efek kartu melayang saat di-hover */
+.report-card:hover {
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(234, 179, 8, 0.2);
+    border-left: 12px solid #eab308 !important;
+}
     </style>
 """, unsafe_allow_html=True)
 
@@ -365,10 +382,31 @@ with st.sidebar:
         st.success("Konfigurasi Berhasil Disimpan!")
 
         # --- MODUL AUTOMATION DI SIDEBAR ---
+# 1. Fungsi load yang lebih aman
+def load_lottieurl(url):
+    try:
+        r = requests.get(url, timeout=5) # Tambah timeout agar tidak loading selamanya
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+# 2. Gunakan link Lottie yang lebih stabil (URL CDN)
+# Ini animasi robot asisten yang sedang bekerja
+lottie_url = "https://lottie.host/df23f81e-1512-4299-8080-87779d711019/3mOIrMshT8.json"
+lottie_robot = load_lottieurl(lottie_url)
+
+# 3. Sidebar dengan pengecekan NoneType
 with st.sidebar:
     st.markdown("---")
     st.header("🤖 Robot Automation")
-    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
+    
+    # Hanya tampilkan animasi jika data berhasil diambil
+    if lottie_robot:
+        st_lottie(lottie_robot, height=150, key="robot")
+    else:
+        st.write("🤖") # Fallback pakai emoji jika internet/link bermasalah
     
     # Ambil list nama skenario dari file automation.py
     scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
@@ -381,6 +419,7 @@ with st.sidebar:
                 # Paksa rerun agar input di Tab Capacity berubah otomatis
                 st.rerun()
 
+
 with st.sidebar:
     st.markdown("---")
     st.markdown(
@@ -392,6 +431,18 @@ with st.sidebar:
         """, 
         unsafe_allow_html=True
     )
+
+with st.expander("🛠️ Technical Specifications (Built by M. Suparman)"):
+    st.markdown("""
+    <div style="background: #1e293b; padding: 15px; border-radius: 10px;">
+        <ul style="list-style-type: none; color: #e2e8f0; padding-left: 0;">
+            <li style="margin-bottom: 10px;">✅ <b>Engine:</b> Danagung Scoring v1.0</li>
+            <li style="margin-bottom: 10px;">✅ <b>Method:</b> Weighted Multi-Criteria Analysis</li>
+            <li style="margin-bottom: 10px;">✅ <b>Automation:</b> Scenario-Based Robot Logic</li>
+            <li style="margin-bottom: 10px;">✅ <b>Security:</b> Audit-Ready Integrity Check</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 with tab_risk:
     st.subheader("📋 Master Matrix Risiko")
