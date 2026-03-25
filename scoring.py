@@ -287,7 +287,9 @@ val_credit_check = st.sidebar.number_input("Skor Credit Checking (SLIK/OJK)", va
 
 # --- MASTER PARAMETER LIST ---
 PARAM_FIELDS = {
-    'p_rt_murni': 'Biaya RT Pokok',
+    'total_penghasilan': 'Total Penghasilan',
+    'pengeluaran_usaha': 'Total Pengeluaran Usaha (Non-Beban)',
+    'p_rt_murni': 'Total Biaya Rumah Tangga',
     'p_sekolah': 'Biaya Sekolah',
     'p_transport': 'Transportasi',
     'p_listrik': 'Listrik',
@@ -296,32 +298,40 @@ PARAM_FIELDS = {
     'p_arisan': 'Arisan'
 }
 
+
+
 # --- LOAD SAVED SETTINGS ---
 saved_data = load_config()
 default_dsr = saved_data['dsr_params'] if saved_data else ['p_hutang']
 default_idir = saved_data['idir_params'] if saved_data else list(PARAM_FIELDS.keys())
 
-with st.sidebar.expander("⚙️ Setting Parameter Kapasitas", expanded=False):
-    st.write("**Hitungan DSR (Hutang Lama):**")
-    selected_dsr = st.multiselect(
-        "Pilih field untuk DSR", 
-        options=list(PARAM_FIELDS.keys()), 
-        format_func=lambda x: PARAM_FIELDS[x],
-        default=default_dsr,
-        key="dsr_select"
-    )
+# Ambil list semua field scoring dari Excel
+all_scoring_groups = df_hitung['group'].unique().tolist()
+default_scoring = saved_data.get('active_scoring', all_scoring_groups) if saved_data else all_scoring_groups
+
+with st.sidebar:
+    st.markdown("### ⚙️ Konfigurasi Kebijakan")
     
-    st.write("**Hitungan IDIR (Total Beban):**")
-    selected_idir = st.multiselect(
-        "Pilih field untuk IDIR", 
-        options=list(PARAM_FIELDS.keys()), 
-        format_func=lambda x: PARAM_FIELDS[x],
-        default=default_idir,
-        key="idir_select"
-    )
-    
-    if st.button("💾 Simpan Permanen Setting"):
-        save_config(selected_dsr, selected_idir)
+    with st.expander("📊 Rumus DSR & IDIR"):
+        selected_dsr = st.multiselect("Beban masuk DSR:", list(PARAM_FIELDS.keys()), 
+                                     default=default_dsr, format_func=lambda x: PARAM_FIELDS[x])
+        selected_idir = st.multiselect("Beban masuk IDIR:", list(PARAM_FIELDS.keys()), 
+                                      default=default_idir, format_func=lambda x: PARAM_FIELDS[x])
+
+    with st.expander("🎯 Filter Poin Scoring"):
+        st.write("Pilih field yang akan berkontribusi pada total poin:")
+        active_scoring_fields = st.multiselect("Field Aktif:", all_scoring_groups, default=default_scoring)
+
+    if st.button("💾 Simpan Permanen Setting", use_container_width=True):
+        config_to_save = {
+            "dsr_params": selected_dsr,
+            "idir_params": selected_idir,
+            "active_scoring": active_scoring_fields,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config_to_save, f, indent=4)
+        st.success("Konfigurasi Berhasil Disimpan!")
 
 with tab_risk:
     st.subheader("📋 Master Matrix Risiko (BE Logic Reference)")
@@ -559,16 +569,21 @@ if st.button("RUN AUDIT CALCULATION", type="primary", use_container_width=True):
     
     # 1. LOOP KALKULASI DATA
     for _, row in rules_table.iterrows():
-        excel_f = row['group']
-        ui_f = "tujuan_pinjaman" if excel_f == "purpose" else excel_f
-        if pd.notna(excel_f) and ui_f in user_inputs:
-            p = find_point(ui_f, user_inputs[ui_f])
-            if ui_f == 'intitusi': p = st.session_state.get('point_institusi', 0)
-            details.append({
-                'Category': str(row['score_type']).lower().strip(),
-                'Field': ui_f, 'Value': user_inputs[ui_f],
-                'Point': p, 'Weight': row['bobot'], 'Weighted': p * row['bobot']
-            })
+        f_name = row['group']
+        # --- FITUR BARU: Filter Poin Scoring ---
+        if f_name in active_scoring_fields:
+            p = find_point(f_name, user_inputs.get(f_name, 0))
+            w = row['bobot']
+        else:
+            # Jika tidak dicentang di sidebar, poin otomatis 0
+            p = 0
+            w = 0
+            
+        details.append({
+            'Category': str(row['score_type']).lower().strip(),
+            'Field': f_name, 
+            'Point': p, 'Weight': w, 'Weighted': p * w
+        })
 
     # 2. INPUT AGUNAN DINAMIS
     total_coll_points_raw = 0
