@@ -96,6 +96,40 @@ st.markdown("""
     box-shadow: 0 10px 20px rgba(234, 179, 8, 0.2);
     border-left: 12px solid #eab308 !important;
 }
+
+/* --- STYLING TABS DANAGUNG --- */
+    /* Container utama Tab */
+    div[data-testid="stTabs"] {
+        background-color: #1e293b; /* Menyesuaikan background dark slate Bapak */
+        padding: 10px 20px 0px 20px;
+        border-radius: 15px 15px 0 0;
+    }
+
+    /* Style untuk setiap tombol Tab */
+    button[data-baseweb="tab"] {
+        color: #94a3b8 !important; /* Warna teks saat tidak aktif (Abu-abu) */
+        font-weight: bold;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    /* Efek saat kursor di atas Tab (Hover) */
+    button[data-baseweb="tab"]:hover {
+        color: #c21b1b !important; /* Berubah jadi Merah Danagung */
+        background-color: rgba(194, 27, 27, 0.1);
+    }
+
+    /* Style untuk Tab yang sedang AKTIF (Emas) */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #eab308 !important; /* Teks jadi Emas */
+        border-bottom: 3px solid #eab308 !important; /* Garis bawah Emas */
+        background-color: rgba(234, 179, 8, 0.05); /* Tanda tipis emas di background */
+    }
+
+    /* Menghilangkan garis bawah default Streamlit yang tipis */
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        border-bottom: 1px solid #334155;
+    }
     </style>
 """, unsafe_allow_html=True)
 
