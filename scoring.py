@@ -344,23 +344,23 @@ with st.sidebar:
         st.success("Konfigurasi Berhasil Disimpan!")
 
 with tab_risk:
-    st.subheader("📋 Master Matrix Risiko (BE Logic Reference)")
+    st.subheader("📋 Master Matrix Risiko")
     
     # Konversi JSON ke DataFrame agar rapi
     df_risk_ui = pd.json_normalize(MASTER_RISIKO_SCORE)
     
     # Gabung kolom range agar enak dibaca
-    df_risk_ui['BE_Score_Range'] = df_risk_ui['range_score.min'].astype(str) + " - " + df_risk_ui['range_score.max'].astype(str)
+    df_risk_ui['Score_Range'] = df_risk_ui['range_score.min'].astype(str) + " - " + df_risk_ui['range_score.max'].astype(str)
     df_risk_ui['Credit_Check_Range'] = df_risk_ui['range_score_credit_checking.min'].astype(str) + " - " + df_risk_ui['range_score_credit_checking.max'].astype(str)
     
     # Seleksi kolom yang relevan
-    cols_to_show = ['_id', 'nama_risiko', 'BE_Score_Range', 'Credit_Check_Range', 'level', 'deskripsi']
+    cols_to_show = ['_id', 'nama_risiko', 'Score_Range', 'Credit_Check_Range', 'level', 'deskripsi']
     
     # Tampilkan tabel dengan desain interaktif
     st.dataframe(df_risk_ui[cols_to_show].rename(columns={
         'nama_risiko': 'Status Risiko',
         'level': 'Level',
-        'deskripsi': 'Analisa BE'
+        'deskripsi': 'Analisa'
     }), use_container_width=True, hide_index=True)
 
 total_coll_fe_points = 0
