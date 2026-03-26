@@ -336,12 +336,12 @@ def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description
 
     pdf_output = pdf.output()
     
-    if isinstance(pdf_output, str):
-        # Jika outputnya string (versi lama), encode ke bytes
-        return pdf_output.encode('latin-1')
-    else:
-        # Jika outputnya bytearray (versi fpdf2), konversi ke bytes
-        return bytes(pdf_output)
+        if isinstance(pdf_output, str):
+            # Jika outputnya string (versi lama), encode ke bytes
+            return pdf_output.encode('latin-1')
+        else:
+            # Jika outputnya bytearray (versi fpdf2), konversi ke bytes
+            return bytes(pdf_output)
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
