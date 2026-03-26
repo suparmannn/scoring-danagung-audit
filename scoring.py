@@ -443,7 +443,7 @@ user_inputs = {}
 #     "CAPACITY", "CHARACTER", "CONDITION", "COLLATERAL", "CAPITAL", "🛡️ RISK MASTER"
 # ])
 # --- 3. UI HEADER (GANTI st.title LAMA DENGAN INI) ---
-header_col1, header_col2 = st.columns([0.5, 10]) 
+header_col1, header_col2 = st.columns([0.5, 0.5]) 
 
 with header_col1:
     path_lottie_logo = "logo_animasi.json" 
