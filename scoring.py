@@ -1199,10 +1199,10 @@ if st.session_state.audit_run:
     st.markdown("---")
 
     # TAMBAHKAN ANIMASI SENSITIVITY
-    lottie_sens = load_lottie_local("Thinking.json")
+    
     if lottie_sens:
         st_lottie(lottie_sens, height=150, key="sens_anim")
-    st.subheader("🔍 Sensitivity Analysis")
+    st.subheader lottie_sens = load_lottie_local("Thinking.json") ("Sensitivity Analysis")
     st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
     # 1. Slider untuk Simulasi Penurunan Penghasilan
