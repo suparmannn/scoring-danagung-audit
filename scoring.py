@@ -277,66 +277,78 @@ class CreditReport(FPDF):
 
 # TAMBAHKAN 'risk_description' di dalam kurung (parameter ke-4)
 def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description):
-    # Pastikan class CreditReport(FPDF) sudah terdefinisi
+    # Fungsi bantu untuk membersihkan teks agar tidak error encoding
+    def clean_text(text):
+        if text is None: return ""
+        # Ganti simbol Rp yang aneh dengan Rp standar
+        text = str(text).replace('Rp', 'Rp.').replace('–', '-').replace('—', '-')
+        # Encode ke latin-1 dan abaikan karakter yang tidak dikenal agar tidak crash
+        return text.encode('latin-1', 'replace').decode('latin-1')
+
     pdf = CreditReport()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     
-    # --- PROFIL PEMOHON ---
+    # --- 1. INFORMASI PEMOHON ---
     pdf.set_font('helvetica', 'B', 12)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(0, 10, ' I. PROFIL PEMOHON', 0, 1, 'L', fill=True)
+    pdf.cell(0, 10, clean_text(' I. PROFIL PEMOHON'), 0, 1, 'L', fill=True)
     pdf.set_font('helvetica', '', 10)
     
-    # Gunakan .encode('latin-1', 'replace').decode('latin-1') 
-    # untuk mencegah error jika ada karakter aneh (seperti emoji atau simbol Rp)
-    name = data_json["data"]["pemohon"]["name"].encode('latin-1', 'replace').decode('latin-1')
-    pdf.cell(50, 8, 'Nama Nasabah:', 0, 0)
-    pdf.cell(0, 8, f': {name}', 0, 1)
+    pdf.cell(50, 8, clean_text('Nama Nasabah:'), 0, 0)
+    pdf.cell(0, 8, f": {clean_text(data_json['data']['pemohon']['name'])}", 0, 1)
     
-    # --- RINCIAN POIN SCORING (TABEL) ---
+    pdf.cell(50, 8, clean_text('Estimasi Plafon:'), 0, 0)
+    # Gunakan format_rp tapi bersihkan hasilnya
+    plafon_str = format_rp(data_json["data"]["pengajuan"]["submission_loan"])
+    pdf.cell(0, 8, f": {clean_text(plafon_str)}", 0, 1)
+    pdf.ln(5)
+
+    # --- 2. HASIL SCORING (TABEL) ---
     pdf.set_font('helvetica', 'B', 12)
-    pdf.cell(0, 10, ' II. RINCIAN POIN SCORING', 0, 1, 'L', fill=True)
+    pdf.cell(0, 10, clean_text(' II. RINCIAN POIN SCORING'), 0, 1, 'L', fill=True)
     
     # Header Tabel
     pdf.set_fill_color(234, 179, 8) 
     pdf.set_text_color(255)
     pdf.set_font('helvetica', 'B', 10)
     pdf.cell(50, 10, ' Kategori', 1, 0, 'C', fill=True)
-    pdf.cell(70, 10, ' Total Poin (Weight x Point)', 1, 0, 'C', fill=True)
+    pdf.cell(70, 10, ' Total Poin', 1, 0, 'C', fill=True)
     pdf.cell(70, 10, ' Skor Akhir Pilar', 1, 1, 'C', fill=True)
     
+    # Isi Tabel
     pdf.set_text_color(0)
     pdf.set_font('helvetica', '', 10)
     for pilar, point in data_json["data"]["scoring_point"].items():
-        pdf.cell(50, 8, f' {pilar.upper()}', 1, 0)
-        pdf.cell(70, 8, f' {point}', 1, 0, 'C')
-        pdf.cell(70, 8, f' {point}', 1, 1, 'C')
+        pdf.cell(50, 8, f" {pilar.upper()}", 1, 0)
+        pdf.cell(70, 8, f" {point}", 1, 0, 'C')
+        pdf.cell(70, 8, f" {point}", 1, 1, 'C')
     
     pdf.ln(10)
 
-    # --- KESIMPULAN RISIKO ---
+    # --- 3. KESIMPULAN RISIKO ---
     h = risk_color_hex.lstrip('#')
     rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
     
     pdf.set_font('helvetica', 'B', 14)
     pdf.set_text_color(*rgb)
-    pdf.cell(0, 15, f'STATUS ANALISA: {risk_status.upper()}', 1, 1, 'C')
+    pdf.cell(0, 15, clean_text(f'STATUS ANALISA: {risk_status.upper()}'), 1, 1, 'C')
     
     pdf.ln(5)
     pdf.set_text_color(0)
     pdf.set_font('helvetica', 'B', 10)
-    pdf.cell(0, 8, 'Analisa Auditor Kredit:', 0, 1)
+    pdf.cell(0, 8, clean_text('Analisa Auditor Kredit:'), 0, 1)
     pdf.set_font('helvetica', 'I', 10)
     
-    # Bersihkan deskripsi dari karakter non-latin1 agar tidak crash
-    clean_desc = risk_description.encode('latin-1', 'replace').decode('latin-1')
-    pdf.multi_cell(0, 6, clean_desc)
+    # Gunakan clean_text untuk deskripsi yang panjang dari Excel
+    pdf.multi_cell(0, 6, clean_text(risk_description))
 
-    # --- FINAL: RETURN SEBAGAI BYTES (CRITICAL FIX) ---
-    # fpdf2.output() mengembalikan bytearray, Streamlit butuh bytes.
-    return bytes(pdf.output())
-        
+    # --- FINAL: OUTPUT HANDLING ---
+    # Logika agar aman di versi library fpdf lama maupun baru
+    output = pdf.output()
+    if isinstance(output, str):
+        return output.encode('latin-1')
+    return bytes(output)
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
