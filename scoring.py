@@ -1411,7 +1411,7 @@ if st.session_state.audit_run:
         st.json(json_output)
 
         # --- BAGIAN DOWNLOAD REPORT (TARUH DI SINI) ---
-   st.markdown("---")
+    st.markdown("---")
     st.subheader("📥 Download Official Report")
     
     try:
