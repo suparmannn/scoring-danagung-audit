@@ -476,7 +476,7 @@ def load_lottie_local(filepath: str):
         return json.load(f)
 
 # Load animasi dari file yang Bapak upload ke GitHub tadi
-lottie_robot = load_lottie_local("robot.json")
+lottie_robot = load_lottie_local("Ai_Robot.json")
 
 with st.sidebar:
     st.markdown("---")
