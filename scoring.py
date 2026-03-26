@@ -215,18 +215,19 @@ if 'dsr_active_params' not in st.session_state:
 if 'idir_active_params' not in st.session_state:
     st.session_state.idir_active_params = list(param_fields.keys()) # Default IDIR semua masuk
 
-    # --- INITIALIZE STATE DEFAULTS ---
-if 'total_penghasilan' not in st.session_state:
-    st.session_state['total_penghasilan'] = 29212124
-    st.session_state['pengeluaran_usaha'] = 9220230
-    st.session_state['p_rt_murni'] = 293234 
-    st.session_state['p_sekolah'] = 23032
-    st.session_state['p_transport'] = 200000
-    st.session_state['p_listrik'] = 1000000
-    st.session_state['p_telepon'] = 2000
-    st.session_state['p_hutang'] = 450000
-    st.session_state['p_arisan'] = 239000
-    st.session_state['angs_diambil_val'] = 306638
+  # --- INITIALIZE STATE DEFAULTS ---
+# Kita cek satu per satu agar variabel baru tetap terbuat meskipun aplikasi sedang running
+if 'total_penghasilan' not in st.session_state: st.session_state['total_penghasilan'] = 29212124
+if 'pengeluaran_usaha' not in st.session_state: st.session_state['pengeluaran_usaha'] = 9220230
+if 'p_rt_murni' not in st.session_state: st.session_state['p_rt_murni'] = 293234 
+if 'p_sekolah' not in st.session_state: st.session_state['p_sekolah'] = 23032
+if 'p_transport' not in st.session_state: st.session_state['p_transport'] = 200000
+if 'p_listrik' not in st.session_state: st.session_state['p_listrik'] = 1000000
+if 'p_telepon' not in st.session_state: st.session_state['p_telepon'] = 2000
+if 'p_hutang' not in st.session_state: st.session_state['p_hutang'] = 450000
+if 'p_arisan' not in st.session_state: st.session_state['p_arisan'] = 239000
+if 'angs_diambil_val' not in st.session_state: st.session_state['angs_diambil_val'] = 306638
+if 'cap_tenor' not in st.session_state: st.session_state['cap_tenor'] = 30 # Pastikan ini ada agar LTV tidak 0%
 
 # --- 2. ENCODER & HELPERS ---
 class NpEncoder(json.JSONEncoder):
@@ -603,9 +604,22 @@ with tab_cap:
             help=tooltip_detail
         )
 
-        # --- PERBAIKAN DI SINI ---
-        # Gunakan p_rt_murni_calc (angka), JANGAN p_rt_murni (teks)
-       # Di tab_cap, pastiin dictionary ini lengkap semua key-nya
+
+        # --- INPUT UTAMA UNTUK LTV ---
+        # Simpan di memori agar bisa dibaca di Tab Collateral
+        angs_diambil = st.number_input("Angsuran yang Akan Diambil", 
+                                        value=st.session_state.get('angs_diambil_val', 306638), 
+                                        key='angs_diambil_val')
+        tenor_val = st.number_input("Tenor (Bulan)", 
+                                    value=int(st.session_state.get('cap_tenor', 30)), 
+                                    key="cap_tenor")
+
+      
+        # st.error(f"Beban Terpilih: DSR (Rp {beban_dsr:,.0f}) | IDIR (Rp {beban_idir:,.0f})")
+   
+    with c2:
+        # --- 1. RUMUS STANDAR PERBANKAN ---
+
         current_vals = {
             # 'total_penghasilan': total_penghasilan, 
             'pengeluaran_usaha': pengeluaran_usaha,
@@ -623,11 +637,7 @@ with tab_cap:
         beban_dsr = sum(current_vals.get(p, 0) for p in selected_dsr)
         beban_idir = sum(current_vals.get(p, 0) for p in selected_idir)
         
-        st.error(f"Beban Terpilih: DSR (Rp {beban_dsr:,.0f}) | IDIR (Rp {beban_idir:,.0f})")
-        angs_diambil = st.number_input("Angsuran yang Akan Diambil", value=st.session_state.get('angs_diambil_val', 0))
-
-    with c2:
-        # --- 1. RUMUS STANDAR PERBANKAN ---
+        
         # IDIR: Angsuran Baru / Pendapatan
         idir_val = round((angs_diambil / total_penghasilan * 100), 2) if total_penghasilan > 0 else 0
         
@@ -686,7 +696,7 @@ with tab_cap:
 
         # 4. INPUT WIDGETS (Agar sinkron dengan Robot Automation)
         # Gunakan session_state.get agar input berubah otomatis saat robot jalan
-        tenor_val = st.number_input("Tenor (Bulan)", value=int(st.session_state.get('cap_tenor', 30)), key="cap_tenor")
+       
         usia_val = st.number_input("Usia", value=int(st.session_state.get('cap_usia', 41)), key="cap_usia")
         kerja_val = st.number_input("Lama Kerja (Tahun)", value=float(st.session_state.get('cap_work', 3.0)), key="cap_work")
 
@@ -784,6 +794,7 @@ with tab_coll:
     if st.button("➕ Tambah Data Agunan"):
         st.session_state.collaterals.append({
             "unit_name": "Rumah", "address": "", "lt": 0, "lb": 0, "merk": "", "thn": 2020, "hrg": 0,
+            "total_taksasi": 0, "ltv": 0,
             "proses_aset": "On Hand", "akses_jalan": "YA", "domisili": "Alamat Agunan sesuai KTP", 
             "kepemilikan": "Milik Sendiri", "kuburan": "TIDAK", "sutet": "TIDAK", "sungai": "TIDAK"
         })
@@ -815,6 +826,47 @@ with tab_coll:
                 col_item['merk'] = c1.text_input(f"Merk/Tipe #{i}", value=col_item.get('merk') or "", key=f"merk_{i}")
                 col_item['thn'] = c2.number_input(f"Tahun #{i}", value=int(col_item.get('thn') or 2020), key=f"thn_{i}")
                 col_item['hrg'] = c2.number_input(f"Estimasi Harga #{i}", value=int(col_item.get('hrg') or 0), key=f"hrg_{i}")
+
+        # --- TAMBAHAN BARU: PENILAIAN TAKSASI & LTV ---
+         
+                # --- DI DALAM LOOP TAB COLLATERAL ---
+         
+            st.write("**💰 Penilaian Taksasi & LTV**")
+            v1, v2, v3 = st.columns(3)
+            
+            # 1. Input Nilai Taksasi
+            col_item['total_taksasi'] = v1.number_input(f"Total Nilai Taksasi #{i}", 
+                                                        value=int(col_item.get('total_taksasi', 0)), 
+                                                        step=1000000, key=f"taks_{i}")
+            
+            # 2. Ambil data dari memori (Session State)
+         
+            v_angs = st.session_state.get('angs_diambil_val', 0)
+            v_tenor = st.session_state.get('cap_tenor', 0)
+            plafon_kredit = v_angs * v_tenor 
+            
+            if col_item['total_taksasi'] > 0:
+                # Hitung dan bulatkan 2 angka di belakang koma
+                raw_ltv = (plafon_kredit / col_item['total_taksasi'] * 100)
+                ltv_calc = round(raw_ltv, 2) 
+            else:
+                ltv_calc = 0
+            
+            col_item['ltv'] = ltv_calc
+            
+            # Tampilkan dengan format 2 desimal (Contoh: 45.99%)
+            v2.text_input(
+                f"LTV (%) Auto Calculated#{i}", 
+                value=f"{ltv_calc:,.2f}%", # Format string agar selalu 2 desimal
+                disabled=True
+            )
+
+            # 3. Poin LTV (Bakal otomatis narik ke Excel)
+            p_ltv = find_point('comperation_agunan', ltv_calc)
+            v3.markdown(f"<br><small style='color: #eab308;'>Poin LTV: <b>{p_ltv}</b></small>", unsafe_allow_html=True)
+
+            
+
 
             st.markdown("---")
             st.write("**📝 Scoring Detail**")
@@ -961,13 +1013,14 @@ if st.session_state.audit_run:
    # 3. MASUKKAN POIN COLLATERAL (LOGIKA BARU - TANPA ANGKA GAIB)
     total_p_coll = 0
     for asset in st.session_state.collaterals:
-        # Poin dasar
         p_u = find_point('agunan', asset.get('unit_name'))
         p_p = find_point('proses_aset', asset.get('proses_aset'))
         p_d = find_point('domisili', asset.get('domisili'))
         p_k = find_point('kepemilikan_aset', asset.get('kepemilikan'))
         
-        # Poin lingkungan rill (Hanya jika Rumah/Tanah/Ruko)
+        # Tambahkan Poin LTV (comperation_agunan)
+        p_ltv_val = find_point('comperation_agunan', asset.get('ltv', 0))
+        
         p_env = 0
         if asset.get('unit_name') in ["Rumah", "Tanah", "Ruko"]:
             p_env += find_point('akses_jalan_roda_4', asset.get('akses_jalan'))
@@ -975,15 +1028,13 @@ if st.session_state.audit_run:
             p_env += find_point('dalam_200m_terdapat_sutet', asset.get('sutet'))
             p_env += find_point('dalam_200m_terdapat_sungai', asset.get('sungai'))
         
-        # Total rill per agunan
-        total_p_coll += (p_u + p_p + p_d + p_k + p_env)
+        # Sertakan p_ltv_val ke dalam total
+        total_p_coll += (p_u + p_p + p_d + p_k + p_ltv_val + p_env)
 
-    # Masukkan ke list details untuk summary
-    # Kita set bobot ke 1.0 karena pembobotan produk dilakukan di langkah berikutnya
+    # Update detail untuk summary tabel
     details.append({
         'Category': 'collateral', 
         'Field': 'dynamic_collateral', 
-        'Value': f"{len(st.session_state.collaterals)} Assets",
         'Point': total_p_coll, 
         'Weight': 1.0, 
         'Weighted': total_p_coll
