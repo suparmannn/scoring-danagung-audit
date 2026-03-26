@@ -742,21 +742,43 @@ with tab_char:
                                                      key="char_tujuan_ui")
         show_point('tujuan_pinjaman', user_inputs['tujuan_pinjaman'])
         
-        # --- MERGED STATUS DROPDOWN ---
-        list_status = get_options_safe('tanpa_agunan') + get_options_safe('dengan_agunan')
-        selected_status = st.selectbox("Status Kolektibilitas", list_status, 
-                                      index=get_idx(list_status, 'char_kolektibilitas'), 
-                                      key="char_kol_ui")
+      # --- 1. GABUNG OPSI DARI DICTIONARY (Bukan Excel) ---
+        list_status = (
+            list(KOLEKTIBILITAS_DATA['tanpa_agunan'].keys()) + 
+            list(KOLEKTIBILITAS_DATA['dengan_agunan'].keys()) + 
+            list(KOLEKTIBILITAS_DATA['debitur_baru'].keys())
+        )
         
-        if selected_status in get_options_safe('tanpa_agunan'):
-            inherited_point = find_point('tanpa_agunan', selected_status)
+        selected_status = st.selectbox(
+            "Status Kolektibilitas", 
+            list_status, 
+            index=get_idx(list_status, 'char_kolektibilitas'), 
+            key="char_kol_ui"
+        )
+
+        # --- 2. LOGIKA PENENTUAN POIN & GROUP ---
+        inherited_point = 0
+        current_group = ""
+
+        if selected_status in KOLEKTIBILITAS_DATA['tanpa_agunan']:
+            inherited_point = KOLEKTIBILITAS_DATA['tanpa_agunan'][selected_status]
+            current_group = 'tanpa_agunan'
+        elif selected_status in KOLEKTIBILITAS_DATA['dengan_agunan']:
+            inherited_point = KOLEKTIBILITAS_DATA['dengan_agunan'][selected_status]
+            current_group = 'dengan_agunan'
         else:
-            inherited_point = find_point('dengan_agunan', selected_status)
-            
-        user_inputs['status'] = selected_status
+            inherited_point = KOLEKTIBILITAS_DATA['debitur_baru'][selected_status]
+            current_group = 'debitur_baru'
+
+        # Simpan ke user_inputs agar terbaca di tabel hasil audit
+        user_inputs[current_group] = selected_status
         st.markdown(f"<small style='color: #007bff;'>Poin Status: <b>{inherited_point}</b></small>", unsafe_allow_html=True)
         
-        user_inputs['intitusi'] = st.text_input("Institusi Keuangan", value="Modal Usaha")
+        # --- 3. LOGIKA INSTITUSI KEUANGAN ---
+        inst_val = st.text_input("Institusi Keuangan", value="Modal Usaha", key="inst_val_ui")
+        user_inputs['intitusi_name'] = inst_val # Simpan namanya
+        
+        # Simpan poin kolektibilitas ke session state untuk ditarik JSON Constructor
         st.session_state['point_institusi'] = inherited_point 
         st.markdown(f"<small style='color: green;'>Poin Institusi (Auto Match Status): <b>{inherited_point}</b></small>", unsafe_allow_html=True)
         
@@ -1126,20 +1148,162 @@ if st.session_state.audit_run:
     st.table(summary_display[['Category', 'Total Poin', 'Weighted Subtotal', 'Bobot Produk', 'Skor Final']])
 
     # --- JSON CONSTRUCTOR (FIX NAMEERROR) ---
+
+    # --- PROSES PEMBENTUKAN JSON SUPER DETAILED ---
+    # --- HELPER: Logic Null untuk Capa ---
+    def get_val_or_null(param_key, actual_value):
+        if param_key in selected_dsr or param_key in selected_idir:
+            return actual_value
+        return None
+
+    def to_bool(val):
+        if val == "YA": return True
+        if val == "TIDAK": return False
+        return None
+    
+
+    # --- PROSES PEMBENTUKAN JSON SUPER DETAILED ---
+    # 1. Bangun List Character secara Manual agar Presisi
+    char_list_json = []
+    
+
+    # Lewati group kolektibilitas agar tidak double mapping
+    for _, row in df_res[df_res['Category'] == 'character'].iterrows():
+        f_name = row['Field']
+        if f_name in ['tanpa_agunan', 'dengan_agunan', 'debitur_baru']:
+            continue
+            
+        char_list_json.append({
+            "id": find_rule_id(f_name, user_inputs.get(f_name)),
+            "group": f_name,
+            "text": str(user_inputs.get(f_name)),
+            "value": str(user_inputs.get(f_name)),
+            "point": int(row['Point'])
+        })
+
+    # Tambahkan Kolektibilitas (Data Poin dari Dictionary KOLEKTIBILITAS_DATA)
+    current_kol_status = user_inputs.get('tanpa_agunan') or user_inputs.get('dengan_agunan') or user_inputs.get('debitur_baru')
+    kol_group = "tanpa_agunan" if user_inputs.get('tanpa_agunan') else ("dengan_agunan" if user_inputs.get('dengan_agunan') else "debitur_baru")
+    
+    if current_kol_status:
+        char_list_json.append({
+            "id": find_rule_id(kol_group, current_kol_status),
+            "group": kol_group,
+            "text": str(current_kol_status),
+            "value": str(current_kol_status),
+            "point": int(st.session_state.get('point_institusi', 0))
+        })
+
+    # Tambahkan Manual Group "intitusi" (Sesuai Ekspektasi Bapak)
+    char_list_json.append({
+        "id": None,
+        "group": "intitusi",
+        "text": None,
+        "value": None,
+        "point": int(st.session_state.get('point_institusi', 0))
+    })
+
     json_output = {
+        "error": 0,
+        "error_code": 0,
+        "message": "OK",
+        "response_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "data": {
+            "pemohon": {
+                "name": "NASABAH DANAGUNG",
+                "domisili_address": "Alamat sesuai KTP"
+            },
             "pengajuan": {
-                "product_id": prod_id, 
-                "total_be_score": total_be_score, 
-                "risk_status": final_risk_data['nama_risiko']
+                "product_id": prod_id,
+                "submission_loan": angs_diambil * tenor_val,
+                "tenor": tenor_val,
+                "tenor_id": f"{tenor_val}M",
+                "tenor_type": "BULAN",
+                "interest_rate": 0, 
+                "use_ltv": True if st.session_state.collaterals else False,
+                "ltv_value": st.session_state.collaterals[0].get('ltv', 0) if st.session_state.collaterals else 0,
+                "range_interest_rate": "0%"
             },
             "scoring": {
-                "capa": [{
-                        "total_penghasilan": total_penghasilan, 
-                        "max_angs": maksAngsuran_audit, # Variabel sudah didefinisikan di atas
+                "char": char_list_json,
+                
+                "capa": [
+                    {
+                        "total_penghasilan": total_penghasilan,
+                        "total_pengeluaran_usaha": pengeluaran_usaha,
+                        "pengeluaran_rumah_tangga": get_val_or_null('p_rt_murni', p_rt_murni_calc),
+                        "pengeluaran_transportasi": get_val_or_null('p_transport', p_transport),
+                        "pengeluaran_listrik": get_val_or_null('p_listrik', p_listrik),
+                        "pengeluaran_telepon": get_val_or_null('p_telepon', p_telepon),
+                        "pengeluaran_hutang": get_val_or_null('p_hutang', p_hutang),
+                        "pengeluaran_arisan": get_val_or_null('p_arisan', p_arisan),
+                        "max_angs": plafon_maks_kebijakan,
                         "angs_diambil": angs_diambil,
-                        "idir": idir_val, "dsr": dsr_val
-                }]
+                        "idir": idir_val,
+                        "dsr": dsr_val
+                    }
+                ],
+
+                "cond": [
+                    {
+                        "id": find_rule_id(row['Field'], user_inputs.get(row['Field'])),
+                        "group": row['Field'],
+                        "text": str(user_inputs.get(row['Field'])),
+                        "value": str(user_inputs.get(row['Field'])),
+                        "point": int(row['Point'])
+                    } for _, row in df_res[df_res['Category'] == 'condition'].iterrows()
+                ],
+
+                "capi": [
+                    {
+                        "id": find_rule_id(row['Field'], user_inputs.get(row['Field'])),
+                        "group": row['Field'],
+                        "text": str(user_inputs.get(row['Field'])),
+                        "value": str(user_inputs.get(row['Field'])),
+                        "point": int(row['Point'])
+                    } for _, row in df_res[df_res['Category'] == 'capital'].iterrows()
+                ],
+
+                "coll": [
+                    {
+                        "group": "comperation_agunan",
+                        "point": find_point('comperation_agunan', asset.get('ltv', 0)),
+                        "total_taksasi": asset.get('total_taksasi', 0),
+                        "ltv": asset.get('ltv', 0)
+                    } for asset in st.session_state.collaterals
+                ],
+
+                "coll_agunan": [
+                    {
+                        "agunan_id": f"AGN-{i}",
+                        "unit_name": asset['unit_name'],
+                        "unit_id": "RMH" if asset['unit_name'] == "Rumah" else ("TNH" if asset['unit_name'] == "Tanah" else ("RKO" if asset['unit_name'] == "Ruko" else "MBL")),
+                        "type_id": "AT" if asset['unit_name'] in ["Rumah", "Tanah", "Ruko"] else "AB",
+                        "type_name": "Aset Tetap" if asset['unit_name'] in ["Rumah", "Tanah", "Ruko"] else "Aset Bergerak",
+                        "desc": asset.get('address', ""),
+                        "luas_tanah": str(asset.get('lt', 0)),
+                        "luas_bangunan": str(asset.get('lb', 0)),
+                        "harga": asset.get('hrg', 0),
+                        "taksasi": asset.get('total_taksasi', 0),
+                        "is_akses_roda_empat": to_bool(asset.get('akses_jalan')),
+                        "is_terdapat_kuburan": to_bool(asset.get('kuburan')),
+                        "is_terdapat_sutet": to_bool(asset.get('sutet')),
+                        "is_terdapat_sungai": to_bool(asset.get('sungai')),
+                        "is_sesuai_domisili": True if asset.get('domisili') == "Alamat Agunan sesuai KTP" else False,
+                        "address": asset['address'],
+                        "scores": [
+                            {"group": "agunan", "point": find_point('agunan', asset['unit_name'])},
+                            {"group": "proses_aset", "point": find_point('proses_aset', asset.get('proses_aset'))},
+                            {"group": "kepemilikan_aset", "point": find_point('kepemilikan_aset', asset.get('kepemilikan'))}
+                        ]
+                    } for i, asset in enumerate(st.session_state.collaterals)
+                ]
+            },
+            "scoring_point": {
+                "char": float(summary[summary['Category'] == 'character']['Skor_BE'].sum()),
+                "capa": float(summary[summary['Category'] == 'capacity']['Skor_BE'].sum()),
+                "cond": float(summary[summary['Category'] == 'condition']['Skor_BE'].sum()),
+                "capi": float(summary[summary['Category'] == 'capital']['Skor_BE'].sum())
             }
         }
     }
