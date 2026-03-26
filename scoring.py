@@ -260,6 +260,32 @@ def load_lottie_local(filepath: str):
     with open(filepath, "r") as f:
         return json.load(f)
 
+# --- HELPER UNTUK MEMBUAT SUBHEADER BERANIMASI (Flexbox) ---
+def st_animated_subheader(lottie_data, text, height=50, key="anim_sub"):
+    """
+    Membuat subheader dengan Lottie icon di samping teks menggunakan Flexbox.
+    """
+    if lottie_data:
+        # Gunakan 3 kolom: 1 untuk animasi (sempit), 1 untuk teks, 1 sisa empty
+        # Ratio [0.15, 1, 0.1] memastikan animasi dekat dengan teks
+        col_anim, col_text, col_empty = st.columns([0.15, 1, 0.1])
+        
+        with col_anim:
+            # Render animasi dengan tinggi yang sesuai dengan teks
+            st_lottie(lottie_data, height=height, key=key, speed=1, loop=True)
+            
+        with col_text:
+            # Gunakan Markdown untuk teks agar vertikal alignment-nya sejajar tengah
+            # Kita buat sedikit padding top agar sejajar dengan animasi
+            st.markdown(f"""
+                <div style='display: flex; align-items: center; height: {height}px; padding-top: 10px;'>
+                    <h3 style='margin: 0; color: #eab308; font-size: 1.5rem;'>{text}</h3>
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        # Fallback jika json tidak ketemu, pakai subheader biasa
+        st.subheader(text)
+
 class CreditReport(FPDF):
     def header(self):
         # Logo Danagung (Jika file ada)
@@ -1199,10 +1225,15 @@ if st.session_state.audit_run:
     st.markdown("---")
 
     # TAMBAHKAN ANIMASI SENSITIVITY
+  # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
+    st.markdown("---")
     
-    if lottie_sens:
-        st_lottie(lottie_sens, height=150, key="sens_anim")
-    st.subheader lottie_sens = load_lottie_local("Thinking.json") ("Sensitivity Analysis")
+    # 1. Load datanya dulu
+    lottie_sens = load_lottie_local("Thinking.json")
+    
+    # 2. Panggil fungsi animated subheader (Ganti st.subheader yang lama)
+    # Tinggi diatur 50 agar serasi dengan teks subheader default
+    st_animated_subheader(lottie_sens, "Sensitivity Analysis", height=50, key="sens_header_anim")
     st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
     # 1. Slider untuk Simulasi Penurunan Penghasilan
