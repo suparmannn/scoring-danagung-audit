@@ -1411,12 +1411,12 @@ if st.session_state.audit_run:
         st.json(json_output)
 
         # --- BAGIAN DOWNLOAD REPORT (TARUH DI SINI) ---
-    st.markdown("---")
+   st.markdown("---")
     st.subheader("📥 Download Official Report")
     
     try:
-        # Generate biner PDF
-        final_pdf = generate_pdf_report(
+        # Panggil fungsi yang sudah kita perbaiki di atas
+        final_pdf_bin = generate_pdf_report(
             json_output, 
             final_risk_data['nama_risiko'], 
             risk_color, 
@@ -1427,8 +1427,8 @@ if st.session_state.audit_run:
         with col_dl1:
             st.download_button(
                 label="📄 Download Report PDF (Audit)",
-                data=final_pdf,
-                file_name=f"Audit_Danagung_{datetime.now().strftime('%Y%m%d')}.pdf",
+                data=final_pdf_bin,
+                file_name=f"Audit_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
