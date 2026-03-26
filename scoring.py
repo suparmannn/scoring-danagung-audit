@@ -1402,23 +1402,21 @@ if st.session_state.audit_run:
     st.markdown("---")
     st.subheader("📥 Download Official Report")
     
-    # 1. Generate PDF Bytes secara Runtime
     try:
-        pdf_bytes = generate_pdf_report(
+        # Generate biner PDF
+        final_pdf = generate_pdf_report(
             json_output, 
             final_risk_data['nama_risiko'], 
-            risk_color,
-            final_risk_data['deskripsi'] 
+            risk_color, 
+            final_risk_data['deskripsi']
         )
         
-        # 2. Layout Tombol Berdampingan
         col_dl1, col_dl2 = st.columns(2)
-        
         with col_dl1:
             st.download_button(
                 label="📄 Download Report PDF (Audit)",
-                data=pdf_bytes,
-                file_name=f"Audit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                data=final_pdf,
+                file_name=f"Audit_Danagung_{datetime.now().strftime('%Y%m%d')}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
@@ -1435,4 +1433,4 @@ if st.session_state.audit_run:
         st.success("✅ Laporan siap diunduh. Silakan pilih format yang diinginkan.")
         
     except Exception as e:
-        st.error(f"Gagal menyiapkan laporan: {e}")
+        st.error(f"Sistem gagal membuat PDF: {e}")
