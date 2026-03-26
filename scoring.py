@@ -277,9 +277,9 @@ class CreditReport(FPDF):
 
 # TAMBAHKAN 'risk_description' di dalam kurung (parameter ke-4)
 def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description):
-    pdf = CreditReport()
+    pdf = CreditReport() 
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    
     # --- 1. INFORMASI PEMOHON ---
     pdf.set_font('helvetica', 'B', 12)
     pdf.set_fill_color(240, 240, 240)
@@ -334,7 +334,14 @@ def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description
     # GUNAKAN 'risk_description' yang dikirim dari pemanggil
     pdf.multi_cell(0, 6, f'{risk_description}')
 
-    return bytes(pdf.output())
+    pdf_output = pdf.output()
+    
+    if isinstance(pdf_output, str):
+        # Jika outputnya string (versi lama), encode ke bytes
+        return pdf_output.encode('latin-1')
+    else:
+        # Jika outputnya bytearray (versi fpdf2), konversi ke bytes
+        return bytes(pdf_output)
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
