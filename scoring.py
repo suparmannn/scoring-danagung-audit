@@ -443,11 +443,9 @@ user_inputs = {}
 #     "CAPACITY", "CHARACTER", "CONDITION", "COLLATERAL", "CAPITAL", "🛡️ RISK MASTER"
 # ])
 # --- 3. UI HEADER (GANTI st.title LAMA DENGAN INI) ---
-header_col1, header_col2 = st.columns([1, 4])
+header_col1, header_col2 = st.columns([1.5, 4]) 
 
 with header_col1:
-    # 1. Coba load animasi Lottie untuk logo
-    # Asumsi nama filenya adalah 'logo_animasi.json'
     path_lottie_logo = "logo_animasi.json" 
     
     if os.path.exists(path_lottie_logo):
@@ -455,10 +453,9 @@ with header_col1:
         st_lottie(
             lottie_logo_data,
             speed=1,
-            reverse=False,
             loop=True,
-            quality="high", # Biar animasinya tajam
-            height=100,     # Sesuaikan tingginya agar pas dengan teks BPR DANAGUNG
+            quality="high",
+            height=180,    # <--- NAIKKAN KE 180 ATAU 200
             key="logo_header"
         )
     # 2. Jika file Lottie tidak ada, pakai gambar PNG lama
