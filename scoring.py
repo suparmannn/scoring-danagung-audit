@@ -385,7 +385,7 @@ with st.sidebar:
     if lottie_robot:
         st_lottie(lottie_robot, height=150, key="robot_hosting")
     
-    st.caption("Pilih skenario untuk pengujian cepat (Stress Test)")
+    st.caption("Pilih skenario untuk pengujian cepat")
     
     # Ambil list nama skenario dari file automation.py
     scenarios = ["Manual Input"] + list(get_scenario_presets().keys())
@@ -1079,7 +1079,7 @@ if st.session_state.audit_run:
 
     # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
     st.markdown("---")
-    st.subheader("🔍 Stress Test: Sensitivity Analysis")
+    st.subheader("🔍 Sensitivity Analysis")
     st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
     # 1. Slider untuk Simulasi Penurunan Penghasilan
