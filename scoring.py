@@ -10,6 +10,7 @@ import numpy as np
 from datetime import datetime
 from automation import apply_automation, get_scenario_presets
 from streamlit_lottie import st_lottie
+from fpdf import FPDF
 # import requests
 
 st.set_page_config(page_title="Audit Tool - Scoring Danagung", layout="wide")
@@ -253,6 +254,87 @@ def get_idx(options, state_key, default_idx=0):
     if val in options:
         return options.index(val)
     return default_idx
+
+    
+
+class CreditReport(FPDF):
+    def header(self):
+        # Logo Danagung (Jika file ada)
+        if os.path.exists('logo_danagung.png'):
+            self.image('logo_danagung.png', 10, 8, 33)
+        
+        self.set_font('helvetica', 'B', 15)
+        self.set_text_color(194, 27, 27) # Merah Danagung
+        self.cell(80)
+        self.cell(30, 10, 'LAPORAN AUDIT SCORING KREDIT', 0, 0, 'C')
+        self.ln(20)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('helvetica', 'I', 8)
+        self.set_text_color(128)
+        self.cell(0, 10, f'Halaman {self.page_no()} | © 2026 BPR Danagung - Audit Tool v1.0', 0, 0, 'C')
+
+# TAMBAHKAN 'risk_description' di dalam kurung (parameter ke-4)
+def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description):
+    pdf = CreditReport()
+    pdf.add_page()
+    
+    # --- 1. INFORMASI PEMOHON ---
+    pdf.set_font('helvetica', 'B', 12)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 10, ' I. PROFIL PEMOHON', 0, 1, 'L', fill=True)
+    pdf.set_font('helvetica', '', 10)
+    pdf.cell(50, 8, 'Nama Nasabah:', 0, 0)
+    pdf.cell(0, 8, f': {data_json["data"]["pemohon"]["name"]}', 0, 1)
+    pdf.cell(50, 8, 'ID Produk:', 0, 0)
+    pdf.cell(0, 8, f': {data_json["data"]["pengajuan"]["product_id"]}', 0, 1)
+    pdf.cell(50, 8, 'Estimasi Plafon:', 0, 0)
+    pdf.cell(0, 8, f': {format_rp(data_json["data"]["pengajuan"]["submission_loan"])}', 0, 1)
+    pdf.ln(5)
+
+    # --- 2. HASIL SCORING (TABEL) ---
+    pdf.set_font('helvetica', 'B', 12)
+    pdf.cell(0, 10, ' II. RINCIAN POIN SCORING', 0, 1, 'L', fill=True)
+    pdf.set_font('helvetica', 'B', 10)
+    
+    # Header Tabel
+    pdf.set_fill_color(234, 179, 8) # Gold Danagung
+    pdf.set_text_color(255)
+    pdf.cell(45, 10, ' Kategori', 1, 0, 'C', fill=True)
+    pdf.cell(45, 10, ' Total Poin', 1, 0, 'C', fill=True)
+    pdf.cell(45, 10, ' Bobot Produk', 1, 0, 'C', fill=True)
+    pdf.cell(55, 10, ' Skor Akhir Pilar', 1, 1, 'C', fill=True)
+    
+    # Isi Tabel
+    pdf.set_text_color(0)
+    pdf.set_font('helvetica', '', 10)
+    for pilar, point in data_json["data"]["scoring_point"].items():
+        pdf.cell(45, 8, f' {pilar.upper()}', 1, 0)
+        pdf.cell(45, 8, f' {point}', 1, 0, 'C')
+        pdf.cell(45, 8, ' Included', 1, 0, 'C')
+        pdf.cell(55, 8, f' {point}', 1, 1, 'C')
+    
+    pdf.ln(10)
+
+    # --- 3. KESIMPULAN RISIKO ---
+    h = risk_color_hex.lstrip('#')
+    rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    
+    pdf.set_font('helvetica', 'B', 14)
+    pdf.set_text_color(*rgb)
+    pdf.cell(0, 15, f'STATUS ANALISA: {risk_status.upper()}', 1, 1, 'C')
+    
+    pdf.ln(5)
+    pdf.set_text_color(0)
+    pdf.set_font('helvetica', 'B', 10)
+    pdf.cell(0, 8, 'Analisa Auditor:', 0, 1)
+    pdf.set_font('helvetica', 'I', 10)
+    
+    # GUNAKAN 'risk_description' yang dikirim dari pemanggil
+    pdf.multi_cell(0, 6, f'{risk_description}')
+
+    return bytes(pdf.output())
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
@@ -1018,6 +1100,9 @@ if st.session_state.audit_run:
 
     details = []
     rules_table = df_hitung[df_hitung['id_produk'] == selected_id_produk]
+
+
+    
     
     # 2. LOOP PILAR (Capacity, Character, Condition, Capital)
     for _, row in rules_table.iterrows():
@@ -1307,6 +1392,45 @@ if st.session_state.audit_run:
             }
         }
     }
-    st.download_button("💾 Download Result JSON", json.dumps(json_output, indent=4, cls=NpEncoder), "audit_result.json")
+    # st.download_button("💾 Download Result JSON", json.dumps(json_output, indent=4, cls=NpEncoder), "audit_result.json")
     with st.expander("🔍 Lihat Preview JSON"):
         st.json(json_output)
+
+        # --- BAGIAN DOWNLOAD REPORT (TARUH DI SINI) ---
+    st.markdown("---")
+    st.subheader("📥 Download Official Report")
+    
+    # 1. Generate PDF Bytes secara Runtime
+    try:
+        pdf_bytes = generate_pdf_report(
+            json_output, 
+            final_risk_data['nama_risiko'], 
+            risk_color,
+            final_risk_data['deskripsi'] 
+        )
+        
+        # 2. Layout Tombol Berdampingan
+        col_dl1, col_dl2 = st.columns(2)
+        
+        with col_dl1:
+            st.download_button(
+                label="📄 Download Report PDF (Audit)",
+                data=pdf_bytes,
+                file_name=f"Audit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+            
+        with col_dl2:
+            st.download_button(
+                label="💾 Download Result JSON (System)", 
+                data=json.dumps(json_output, indent=4, cls=NpEncoder), 
+                file_name=f"audit_result_{datetime.now().strftime('%Y%m%d')}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+            
+        st.success("✅ Laporan siap diunduh. Silakan pilih format yang diinginkan.")
+        
+    except Exception as e:
+        st.error(f"Gagal menyiapkan laporan: {e}")
