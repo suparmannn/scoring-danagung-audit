@@ -455,7 +455,7 @@ with header_col1:
             speed=1,
             loop=True,
             quality="high",
-            height=180,    # <--- NAIKKAN KE 180 ATAU 200
+            height=250,    # <--- NAIKKAN KE 180 ATAU 200
             key="logo_header"
         )
     # 2. Jika file Lottie tidak ada, pakai gambar PNG lama
