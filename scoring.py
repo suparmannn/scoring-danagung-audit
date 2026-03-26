@@ -255,7 +255,10 @@ def get_idx(options, state_key, default_idx=0):
         return options.index(val)
     return default_idx
 
-    
+    # 1. Fungsi load yang lebih aman
+def load_lottie_local(filepath: str):
+    with open(filepath, "r") as f:
+        return json.load(f)
 
 class CreditReport(FPDF):
     def header(self):
@@ -486,10 +489,7 @@ tab_cap, tab_char, tab_cond, tab_coll, tab_capi, tab_risk = st.tabs([
 
 
         # --- MODUL AUTOMATION DI SIDEBAR ---
-# 1. Fungsi load yang lebih aman
-def load_lottie_local(filepath: str):
-    with open(filepath, "r") as f:
-        return json.load(f)
+
 
 # Load animasi dari file yang Bapak upload ke GitHub tadi
 lottie_robot = load_lottie_local("Ai_Robot.json")
