@@ -345,10 +345,15 @@ def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description
 
     # --- FINAL: OUTPUT HANDLING ---
     # Logika agar aman di versi library fpdf lama maupun baru
-    output = pdf.output()
-    if isinstance(output, str):
-        return output.encode('latin-1')
-    return bytes(output)
+   # --- FINAL: OUTPUT HANDLING (PASTI JADI BINARY) ---
+    pdf_output = pdf.output()
+    
+    # Jika output masih berupa string, kita paksa jadi binary dengan encoding latin-1
+    if isinstance(pdf_output, str):
+        return pdf_output.encode('latin-1')
+    
+    # Jika sudah berupa bytearray (versi fpdf2), tinggal diconvert ke bytes
+    return bytes(pdf_output)
 
 KOLEKTIBILITAS_DATA = {
     "tanpa_agunan": {
