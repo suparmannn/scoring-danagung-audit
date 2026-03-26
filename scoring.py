@@ -277,47 +277,45 @@ class CreditReport(FPDF):
 
 # TAMBAHKAN 'risk_description' di dalam kurung (parameter ke-4)
 def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description):
-    pdf = CreditReport() 
+    # Pastikan class CreditReport(FPDF) sudah terdefinisi
+    pdf = CreditReport()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    # --- 1. INFORMASI PEMOHON ---
+    
+    # --- PROFIL PEMOHON ---
     pdf.set_font('helvetica', 'B', 12)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(0, 10, ' I. PROFIL PEMOHON', 0, 1, 'L', fill=True)
     pdf.set_font('helvetica', '', 10)
+    
+    # Gunakan .encode('latin-1', 'replace').decode('latin-1') 
+    # untuk mencegah error jika ada karakter aneh (seperti emoji atau simbol Rp)
+    name = data_json["data"]["pemohon"]["name"].encode('latin-1', 'replace').decode('latin-1')
     pdf.cell(50, 8, 'Nama Nasabah:', 0, 0)
-    pdf.cell(0, 8, f': {data_json["data"]["pemohon"]["name"]}', 0, 1)
-    pdf.cell(50, 8, 'ID Produk:', 0, 0)
-    pdf.cell(0, 8, f': {data_json["data"]["pengajuan"]["product_id"]}', 0, 1)
-    pdf.cell(50, 8, 'Estimasi Plafon:', 0, 0)
-    pdf.cell(0, 8, f': {format_rp(data_json["data"]["pengajuan"]["submission_loan"])}', 0, 1)
-    pdf.ln(5)
-
-    # --- 2. HASIL SCORING (TABEL) ---
+    pdf.cell(0, 8, f': {name}', 0, 1)
+    
+    # --- RINCIAN POIN SCORING (TABEL) ---
     pdf.set_font('helvetica', 'B', 12)
     pdf.cell(0, 10, ' II. RINCIAN POIN SCORING', 0, 1, 'L', fill=True)
-    pdf.set_font('helvetica', 'B', 10)
     
     # Header Tabel
-    pdf.set_fill_color(234, 179, 8) # Gold Danagung
+    pdf.set_fill_color(234, 179, 8) 
     pdf.set_text_color(255)
-    pdf.cell(45, 10, ' Kategori', 1, 0, 'C', fill=True)
-    pdf.cell(45, 10, ' Total Poin', 1, 0, 'C', fill=True)
-    pdf.cell(45, 10, ' Bobot Produk', 1, 0, 'C', fill=True)
-    pdf.cell(55, 10, ' Skor Akhir Pilar', 1, 1, 'C', fill=True)
+    pdf.set_font('helvetica', 'B', 10)
+    pdf.cell(50, 10, ' Kategori', 1, 0, 'C', fill=True)
+    pdf.cell(70, 10, ' Total Poin (Weight x Point)', 1, 0, 'C', fill=True)
+    pdf.cell(70, 10, ' Skor Akhir Pilar', 1, 1, 'C', fill=True)
     
-    # Isi Tabel
     pdf.set_text_color(0)
     pdf.set_font('helvetica', '', 10)
     for pilar, point in data_json["data"]["scoring_point"].items():
-        pdf.cell(45, 8, f' {pilar.upper()}', 1, 0)
-        pdf.cell(45, 8, f' {point}', 1, 0, 'C')
-        pdf.cell(45, 8, ' Included', 1, 0, 'C')
-        pdf.cell(55, 8, f' {point}', 1, 1, 'C')
+        pdf.cell(50, 8, f' {pilar.upper()}', 1, 0)
+        pdf.cell(70, 8, f' {point}', 1, 0, 'C')
+        pdf.cell(70, 8, f' {point}', 1, 1, 'C')
     
     pdf.ln(10)
 
-    # --- 3. KESIMPULAN RISIKO ---
+    # --- KESIMPULAN RISIKO ---
     h = risk_color_hex.lstrip('#')
     rgb = tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
     
@@ -328,19 +326,16 @@ def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description
     pdf.ln(5)
     pdf.set_text_color(0)
     pdf.set_font('helvetica', 'B', 10)
-    pdf.cell(0, 8, 'Analisa Auditor:', 0, 1)
+    pdf.cell(0, 8, 'Analisa Auditor Kredit:', 0, 1)
     pdf.set_font('helvetica', 'I', 10)
     
-    # GUNAKAN 'risk_description' yang dikirim dari pemanggil
-    pdf.multi_cell(0, 6, f'{risk_description}')
+    # Bersihkan deskripsi dari karakter non-latin1 agar tidak crash
+    clean_desc = risk_description.encode('latin-1', 'replace').decode('latin-1')
+    pdf.multi_cell(0, 6, clean_desc)
 
-    pdf_output = pdf.output()
-    if isinstance(pdf_output, str):
-            # Jika outputnya string (versi lama), encode ke bytes
-            return pdf_output.encode('latin-1')
-    else:
-            # Jika outputnya bytearray (versi fpdf2), konversi ke bytes
-            return bytes(pdf_output)
+    # --- FINAL: RETURN SEBAGAI BYTES (CRITICAL FIX) ---
+    # fpdf2.output() mengembalikan bytearray, Streamlit butuh bytes.
+    return bytes(pdf.output())
         
 
 KOLEKTIBILITAS_DATA = {
