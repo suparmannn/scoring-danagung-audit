@@ -268,7 +268,7 @@ def st_animated_subheader(lottie_data, text, height=50, key="anim_sub"):
     if lottie_data:
         # Gunakan 3 kolom: 1 untuk animasi (sempit), 1 untuk teks, 1 sisa empty
         # Ratio [0.15, 1, 0.1] memastikan animasi dekat dengan teks
-        col_anim, col_text, col_empty = st.columns([0.15, 1, 0.1])
+        col_anim, col_text, col_empty = st.columns([0.25, 2, 0.1])
         
         with col_anim:
             # Render animasi dengan tinggi yang sesuai dengan teks
@@ -1233,7 +1233,7 @@ if st.session_state.audit_run:
     
     # 2. Panggil fungsi animated subheader (Ganti st.subheader yang lama)
     # Tinggi diatur 50 agar serasi dengan teks subheader default
-    st_animated_subheader(lottie_sens, "Sensitivity Analysis", height=50, key="sens_header_anim")
+    st_animated_subheader(lottie_sens, "Sensitivity Analysis", height=180, key="sens_header_anim")
     st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
     # 1. Slider untuk Simulasi Penurunan Penghasilan
