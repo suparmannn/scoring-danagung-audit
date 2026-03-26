@@ -443,9 +443,25 @@ user_inputs = {}
 header_col1, header_col2 = st.columns([1, 4])
 
 with header_col1:
-    # Cek apakah file logo ada, jika tidak pakai placeholder
-    if os.path.exists('logo_danagung.png'):
+    # 1. Coba load animasi Lottie untuk logo
+    # Asumsi nama filenya adalah 'logo_animasi.json'
+    path_lottie_logo = "logo_animasi.json" 
+    
+    if os.path.exists(path_lottie_logo):
+        lottie_logo_data = load_lottie_local(path_lottie_logo)
+        st_lottie(
+            lottie_logo_data,
+            speed=1,
+            reverse=False,
+            loop=True,
+            quality="high", # Biar animasinya tajam
+            height=100,     # Sesuaikan tingginya agar pas dengan teks BPR DANAGUNG
+            key="logo_header"
+        )
+    # 2. Jika file Lottie tidak ada, pakai gambar PNG lama
+    elif os.path.exists('logo_danagung.png'):
         st.image('logo_danagung.png', width=200)
+    # 3. Jika dua-duanya tidak ada, baru pakai placeholder Merah
     else:
         st.markdown("""
             <div style='width:120px; height:70px; background:#c21b1b; border-radius:8px; 
