@@ -443,7 +443,7 @@ user_inputs = {}
 #     "CAPACITY", "CHARACTER", "CONDITION", "COLLATERAL", "CAPITAL", "🛡️ RISK MASTER"
 # ])
 # --- 3. UI HEADER (GANTI st.title LAMA DENGAN INI) ---
-header_col1, header_col2 = st.columns([0.5, 4]) 
+header_col1, header_col2 = st.columns([0.5, 10]) 
 
 with header_col1:
     path_lottie_logo = "logo_animasi.json" 
@@ -455,7 +455,7 @@ with header_col1:
             speed=1,
             loop=True,
             quality="high",
-            height=250,    # <--- NAIKKAN KE 180 ATAU 200
+            height=180,    # <--- NAIKKAN KE 180 ATAU 200
             key="logo_header"
         )
     # 2. Jika file Lottie tidak ada, pakai gambar PNG lama
