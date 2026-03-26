@@ -3,4 +3,4 @@ pandas
 openpyxl
 streamlit-lottie
 numpy
-fpdf
+fpdf2
