@@ -276,7 +276,7 @@ class CreditReport(FPDF):
         self.set_y(-15)
         self.set_font('helvetica', 'I', 8)
         self.set_text_color(128)
-        self.cell(0, 10, f'Halaman {self.page_no()} | © 2026 BPR Danagung - Audit Tool v1.0', 0, 0, 'C')
+        self.cell(0, 10, f'Halaman {self.page_no()} | © 2026 Credit Score - Audit Tool v1.0', 0, 0, 'C')
 
 # TAMBAHKAN 'risk_description' di dalam kurung (parameter ke-4)
 def generate_pdf_report(data_json, risk_status, risk_color_hex, risk_description):
@@ -443,7 +443,7 @@ user_inputs = {}
 #     "CAPACITY", "CHARACTER", "CONDITION", "COLLATERAL", "CAPITAL", "🛡️ RISK MASTER"
 # ])
 # --- 3. UI HEADER (GANTI st.title LAMA DENGAN INI) ---
-header_col1, header_col2 = st.columns([1.5, 4]) 
+header_col1, header_col2 = st.columns([2.5, 4]) 
 
 with header_col1:
     path_lottie_logo = "logo_animasi.json" 
@@ -473,7 +473,7 @@ with header_col1:
 with header_col2:
     st.markdown("""
         <div style='margin-left: 10px;'>
-            <h1 style='margin-top: 0; margin-bottom: 5px; color: #c21b1b !important; font-size: 2rem;'>BPR DANAGUNG</h1>
+            <h1 style='margin-top: 0; margin-bottom: 5px; color: #c21b1b !important; font-size: 2rem;'>CREDIT SCORING TOOLS</h1>
             <p style='color: #64748b !important; font-size: 1.1rem; margin: 0;'>Sistem Verifikasi Scoring & Audit Risiko Kredit</p>
             <hr style='margin: 10px 0; border: none; height: 2px; background: linear-gradient(to right, #c21b1b, #f4f7f9);'>
         </div>
