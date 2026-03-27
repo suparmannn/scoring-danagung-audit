@@ -1220,10 +1220,6 @@ if st.session_state.audit_run:
     risk_color = color_map.get(final_risk_data['nama_risiko'], "#3b82f6")
     
 
-    
-    # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
-    st.markdown("---")
-
     # TAMBAHKAN ANIMASI SENSITIVITY
   # --- FITUR BARU: SCORING SENSITIVITY (STRESS TEST) ---
     st.markdown("---")
@@ -1233,7 +1229,7 @@ if st.session_state.audit_run:
     
     # 2. Panggil fungsi animated subheader (Ganti st.subheader yang lama)
     # Tinggi diatur 50 agar serasi dengan teks subheader default
-    st_animated_subheader(lottie_sens, "Sensitivity Analysis", height=180, key="sens_header_anim")
+    st_animated_subheader(lottie_sens, "Sensitivity Analysis", height=230, key="sens_header_anim")
     st.write("Simulasi jika terjadi penurunan kondisi finansial nasabah (Worst Case Scenario). Example : kalau nasabah tiba-tiba penghasilannya turun 20% karena krisis ekonomi? Apakah kodenya tetap 'Aman' atau langsung 'Reject'?")
 
     # 1. Slider untuk Simulasi Penurunan Penghasilan
